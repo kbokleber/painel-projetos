@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Painel de Projetos KBO</title>
+  </head>
+  <body>
+    <div class="dashboard-shell" x-data="dashboardPage">
+      <header class="dashboard-header">
+        <div>
+          <strong>Painel de Projetos KBO</strong>
+          <small x-cloak x-show="user"
+            ><span x-text="usernameLabel"></span> · <span x-text="roleLabel"></span
+          ></small>
+        </div>
+        <button class="secondary-button" type="button" @click="logout">Sair</button>
+      </header>
+      <main class="dashboard-main">
+        <p class="error-message" role="alert" x-cloak x-show="error" x-text="error"></p>
+        <section class="placeholder-card">
+          <span class="brand-mark">Fase 1 concluída</span>
+          <h1>Autenticação ativa</h1>
+          <p>
+            Os módulos de projetos, tarefas, releases e Gantt serão adicionados nas próximas fases
+            após aprovação.
+          </p>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
