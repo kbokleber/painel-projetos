@@ -1,11 +1,15 @@
+# Files excluded from Docker build context (security + size)
 node_modules
 dist
 coverage
 .git
 .github
+# Secrets e .env de runtime — NUNCA no contexto Docker
 .env
-.env.*
-!.env.example
+.env.local
+.env.development
+.env.production
+# Logs e reports
 *.log
 playwright-report
 test-results

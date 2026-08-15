@@ -1,218 +1,175 @@
 # Painel de Projetos KBO
 
-Sistema web interno da KBO Soluções para gestão de projetos, tarefas, releases e visão de portfólio.
+> **Central de portfólio interna da KBO Soluções** — uma plataforma feita pela KBO para KBO, baseada em 20+ anos de experiência em ITSM, integrações e desenvolvimento sob medida.
 
-> Estado atual: **Fase 1 — Autenticação**. As fases seguintes exigem aprovação separada da Gerência de Projetos e do administrador.
+![Status](https://img.shields.io/badge/status-MVP-yellow)
+![Backend](https://img.shields.io/badge/backend-Node.js%20%2B%20TypeScript-blue)
+![Frontend](https://img.shields.io/badge/frontend-Vanilla%20JS%20%2B%20Alpine.js-blue)
+![Database](https://img.shields.io/badge/database-PostgreSQL-blue)
 
-## Escopo entregue na Fase 1
+---
 
-- Login por usuário e senha com hash Argon2id.
-- Sessões opacas persistidas no PostgreSQL; somente o hash SHA-256 do token é armazenado.
-- Cookies de sessão `HttpOnly`, `SameSite=Strict` e `Secure` em produção.
-- Proteção CSRF nas operações de login e logout.
-- Perfis `ADMIN` e `OPERATOR`.
-- Auditoria em PostgreSQL para login bem-sucedido, falha de login e logout.
-- Usuários iniciais `kbokleber` (Administrador) e `ana` (Operador), criados por seed seguro.
-- Interface em JavaScript puro com Alpine.js e build Vite.
-- API Fastify, migrations Drizzle, testes Vitest, ESLint e Prettier.
-- Docker Compose com Node.js 22 e PostgreSQL 16.
+## ✨ O que é
 
-Não há cadastro público e não há 2FA no MVP por decisão de governança.
+O **Painel de Projetos KBO** é uma ferramenta de gestão de portfólio interna para a KBO Soluções Tecnológicas. Centraliza **todos os projetos, tarefas, releases e notas** em um único lugar — substituindo planilhas soltas, listas em chat e scraps de papel.
 
-## Stack
+Numa única tela você vê:
 
-- Node.js 22, TypeScript e Fastify
-- PostgreSQL 16
-- Drizzle ORM e Drizzle Kit
-- Argon2id
-- Alpine.js e Vite
-- Pino (logger nativo do Fastify)
-- Vitest, ESLint e Prettier
-- Docker e Docker Compose
+- 📊 Status agregado de todos os projetos ativos
+- 🎯 Tarefas pendentes, em andamento, bloqueadas e concluídas
+- 📅 Prazos e alertas visuais
+- 👥 Equipe responsável por cada entrega
+- 📜 Histórico de versões (releases)
+- 💬 Notas e contexto de cada projeto
 
-## Pré-requisitos
+---
 
-Para execução com containers:
+## 🚀 Por que usar
 
-- Docker com Docker Compose v2
+Foi feito **sob medida** porque ferramentas prontas (Trello, Asana, Jira, ClickUp) são genéricas demais para a realidade da KBO:
 
-Para desenvolvimento sem container da aplicação:
+| Limitação das ferramentas prontas                     | Como o Painel KBO resolve                   |
+| ----------------------------------------------------- | ------------------------------------------- |
+| Precisam cadastrar empresa inteira pra usar           | **2 perfis**, foco na equipe pequena da KBO |
+| Limite de cards, boards, projetos em planos gratuitos | **Ilimitado** (rodando na VPS da KBO)       |
+| Não integra com nossa stack (n8n, OpenClaw, Hermes)   | Pensado pra isso desde o dia 1              |
+| Custo mensal crescente                                | Custo único de infraestrutura               |
+| Dados hospedados em terceiros (LGPD/SOX)              | 100% on-premise KBO                         |
 
-- Node.js 22.x
-- npm
-- PostgreSQL 16 acessível
+---
 
-## Configuração segura
+## 🏗️ Arquitetura
 
-1. Copie `.env.example` para `.env`.
-2. Preencha todos os campos vazios.
-3. Nunca envie `.env`, senhas, tokens ou hashes ao Git. O `.gitignore` bloqueia arquivos `.env`.
+```
+┌──────────────────────────────────────────┐
+│ Frontend (Vanilla JS + Alpine.js + Vite) │
+│ - Login, Dashboard, Projetos, Tarefas     │
+│ - Drag-and-drop estilo Trello             │
+└──────────────────────────────────────────┘
+            ↓ HTTPS + CSRF
+┌──────────────────────────────────────────┐
+│ Backend (Node.js + TypeScript + Fastify) │
+│ - JWT-less sessão em cookie httpOnly      │
+│ - Argon2id para hash de senhas           │
+│ - Auditoria transacional                  │
+└──────────────────────────────────────────┘
+            ↓ SQL
+┌──────────────────────────────────────────┐
+│ PostgreSQL 16 + Drizzle ORM              │
+│ - Lock otimista por versão                │
+│ - Migrations versionadas                  │
+└──────────────────────────────────────────┘
+```
 
-Gere valores aleatórios independentes para cada segredo e senha inicial:
+### Stack detalhada
+
+- **Backend**: Node.js 22 + TypeScript + Fastify + Drizzle ORM + Argon2id
+- **Frontend**: Vanilla JS + ES Modules + Alpine.js + Vite (build)
+- **Banco**: PostgreSQL 16
+- **Logs**: Pino (estruturado)
+- **Auth**: Sessões em cookie httpOnly + CSRF token
+- **Deploy**: Docker + docker-compose + Coolify (VPS própria)
+- **Testes**: Vitest + Playwright
+
+---
+
+## 🎨 Design
+
+Identidade visual extraída do site oficial [kbosolucoes.com.br](https://kbosolucoes.com.br):
+
+- **Cor primária**: `#2563eb` (azul corporativo KBO)
+- **Cor de destaque**: `#f59e0b` (laranja)
+- **Tipografia**: Plus Jakarta Sans (Google Fonts)
+- **Estilo**: SaaS moderno, cards coloridos estilo Trello
+
+Ver [docs/branding/BRAND-GUIDELINES.md](docs/branding/BRAND-GUIDELINES.md) para detalhes completos.
+
+---
+
+## 📦 Funcionalidades (MVP)
+
+### ✅ Já entregues
+
+- 🔐 **Login + Logout** com sessões Argon2id
+- 📊 **Dashboard** com 4 KPIs (Total, Em Andamento, Atrasado, Concluído)
+- 📋 **Lista de Projetos** com filtros (status, cliente, prioridade, saúde, data)
+- 🎯 **Detalhe do Projeto** com abas (Visão Geral, Tarefas, Releases, Notas)
+- ✅ **CRUD de Tarefas** com status (PENDENTE / EM_ANDAMENTO / BLOQUEADA / CONCLUÍDA / CANCELADA)
+- 🎨 **Drag-and-drop** estilo Trello pra mudar status de tarefa
+- 🛡️ **Auditoria** de todas as ações críticas
+- 📜 **Code automático** (KBO-001, KBO-002...) gerado via Postgres sequence
+- 🔄 **Soft archive** + hard delete (2 passos de proteção)
+
+### 🚧 Roadmap
+
+- 📅 **Releases** com versionamento semântico (vX.Y.Z)
+- 📊 **Gantt** com Frappe Gantt
+- 🔗 **Integrações** com n8n (GitHub, Slack, e-mail)
+- 🚀 **Deploy Coolify** com SSL
+
+---
+
+## 🚀 Como rodar localmente
 
 ```bash
-node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
+# Pré-requisitos: Docker, Node.js 22+
+
+# 1. Clonar o repositório
+git clone https://github.com/kbokleber/painel-projetos.git
+cd painel-projetos
+
+# 2. Subir tudo com Docker
+docker compose --env-file .env up -d
+
+# 3. Rodar migrations + seed (cria 2 usuários iniciais)
+docker compose exec app npm run db:migrate:prod
+docker compose exec app npm run db:seed:prod
+
+# 4. Acessar
+open http://localhost:3100
+
+# Credenciais iniciais (vêm no .env.example, altere antes de subir)
+# ADMIN:    kbokleber  / senha em SEED_ADMIN_PASSWORD
+# OPERATOR: ana        / senha em SEED_OPERATOR_PASSWORD
 ```
 
-Execute o comando separadamente para:
+---
 
-- `POSTGRES_PASSWORD`
-- `COOKIE_SECRET`
-- `CSRF_SECRET`
-- `SEED_ADMIN_PASSWORD`
-- `SEED_OPERATOR_PASSWORD`
+## 🔒 Segurança
 
-As senhas de seed precisam ter pelo menos 12 caracteres. Em produção, utilize o gerenciador de secrets do Coolify em vez de manter um arquivo `.env` no repositório.
+- Senhas hasheadas com **Argon2id** (memory-hard)
+- Sessões em **cookie httpOnly + SameSite=Strict**
+- **CSRF token** em todas as mutations
+- **Lock otimista** por versão em todas as tabelas (evita lost-update)
+- **Auditoria transacional** de login, mutations e deleções
+- Soft delete obrigatório antes de hard delete (proteção contra exclusão acidental)
 
-Exemplo de ajuste da URL local:
+> Antes de ir pra produção, ajuste:
+>
+> - Rotacione as senhas iniciais usando vault (1Password/Bitwarden)
+> - Configure HTTPS com certificado válido
+> - Ative rate limiting (planejado pra Fase 6)
+> - Configure backup automático do Postgres
 
-```dotenv
-DATABASE_URL=postgresql://painel_app:SENHA_URL_ENCODED@postgres:5432/painel_projetos
-```
+---
 
-Se a senha do PostgreSQL contiver caracteres reservados de URL, aplique percent-encoding antes de inseri-la em `DATABASE_URL`.
+## 📚 Documentação
 
-## Execução com Docker Compose
+- **[`docs/branding/BRAND-GUIDELINES.md`](docs/branding/BRAND-GUIDELINES.md)** — Identidade visual completa
+- **[`docs/SOUL.md`](../../profiles/manager/SOUL.md)** — Funcionamento do Gerente de Projetos IA (Ana)
+- **API interna** — ver `src/server/` no repositório
 
-Após configurar `.env`:
+---
 
-```bash
-docker compose up --build
-```
+## 🤝 Sobre a KBO Soluções
 
-O fluxo do container da aplicação:
+A **KBO Soluções Tecnológicas** é uma empresa especializada em ITSM, desenvolvimento de software e integrações, com mais de 20 anos de experiência.
 
-1. aguarda o health check do PostgreSQL;
-2. executa as migrations Drizzle;
-3. executa o seed idempotente;
-4. inicia a aplicação.
+Site oficial: [kbosolucoes.com.br](https://kbosolucoes.com.br)
+Fundador: Kleber Bueno
 
-Acesse:
+---
 
-- Login: `http://localhost:3000/login`
-- Health check: `http://localhost:3000/health/live`
+## 📄 Licença
 
-Para encerrar:
-
-```bash
-docker compose down
-```
-
-Para remover também o volume local do PostgreSQL (ação destrutiva):
-
-```bash
-docker compose down -v
-```
-
-## Desenvolvimento local
-
-Instale dependências:
-
-```bash
-npm ci
-```
-
-Com `DATABASE_URL` apontando para o PostgreSQL:
-
-```bash
-npm run db:migrate
-npm run db:seed
-npm run build
-npm start
-```
-
-O seed é idempotente: se um username já existir, sua senha é preservada. Para trocar uma senha após a criação inicial, use um fluxo administrativo futuro; não altere o seed para sobrescrever credenciais existentes.
-
-## Comandos de qualidade
-
-```bash
-npm test
-npm run lint
-npm run format:check
-npm run build
-```
-
-Para gerar uma nova migration após alterar o schema:
-
-```bash
-npm run db:generate
-```
-
-As migrations versionadas ficam em `drizzle/`.
-
-## Endpoints da Fase 1
-
-### `GET /auth/csrf`
-
-Emite um token CSRF e seu cookie associado. O frontend envia o token no header `x-csrf-token` em requisições de escrita.
-
-### `POST /auth/login`
-
-Payload:
-
-```json
-{
-  "username": "kbokleber",
-  "password": "<senha definida em secret>"
-}
-```
-
-Em sucesso, retorna o usuário autenticado e define o cookie de sessão. Falhas de credencial sempre retornam a mensagem genérica `Usuário ou senha inválidos.`.
-
-### `GET /auth/me`
-
-Retorna o usuário da sessão atual. Sem sessão válida, retorna HTTP 401.
-
-### `POST /auth/logout`
-
-Exige sessão e token CSRF, remove a sessão no PostgreSQL, limpa o cookie e registra auditoria.
-
-## Banco de dados — Fase 1
-
-- `users`: credenciais, perfil e estado de ativação.
-- `sessions`: hash do token opaco, usuário, validade e último acesso.
-- `audit_logs`: ação, usuário quando disponível, IP, user-agent, metadados e data.
-
-Índices foram criados para username, expiração de sessões e consultas de auditoria.
-
-## Segurança
-
-- Senhas são processadas com Argon2id.
-- Tokens de sessão são aleatórios e nunca são persistidos em texto puro.
-- Cookies são `Secure` quando `NODE_ENV=production`.
-- CSRF usa token aleatório assinado por HMAC e cookie `SameSite=Strict`.
-- Logs Pino removem cookies, `set-cookie`, autorização e senha.
-- A mensagem de falha não revela se o usuário existe.
-- O seed não imprime senhas nem hashes.
-- A aplicação no container roda com usuário sem privilégios de root.
-
-Rate limiting e hardening adicional de produção fazem parte da Fase 6, conforme planejamento aprovado.
-
-## Regra de progresso de projetos
-
-A política aprovada é automática: o percentual será calculado usando somente tarefas não canceladas, considerando como progresso as tarefas concluídas. A constante configurável está em:
-
-`src/server/projects/progress-policy.ts`
-
-Valor atual:
-
-```ts
-PROJECT_PROGRESS_CALCULATION = 'COMPLETED_NON_CANCELLED_TASKS';
-```
-
-A implementação do cálculo ocorrerá junto ao módulo de projetos/tarefas, sem alterar a política sem autorização.
-
-## Próximas fases
-
-1. Autenticação — fase atual
-2. Projetos
-3. Tarefas
-4. Releases
-5. Gantt e dashboard
-6. Qualidade, E2E e deploy Coolify
-
-Cada fase exige um GO separado.
-
-## Licença e visibilidade
-
-Este repositório é público por decisão do administrador. Nenhum dado de produção ou segredo deve ser versionado.
+Proprietário — uso interno KBO Soluções. Distribuição externa depende de autorização.
