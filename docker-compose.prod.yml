@@ -1,0 +1,114 @@
+# docker-compose.prod.yml - PRODUÇÃO (Coolify)
+#
+# Uso:  docker compose -f docker-compose.prod.yml up -d
+#       ou pela UI do Coolify apontando pra esse arquivo
+#
+# IMPORTANTE (Coolify):
+# - POSTGRES_PASSWORD, COOKIE_SECRET, CSRF_SECRET devem ser definidas como secrets
+#   no painel do Coolify (ou via .env gerada automaticamente)
+# - As senhas SEED_* devem ser trocadas após o primeiro deploy (script de seed)
+# - O volume postgres_data persiste dados entre deploys do app
+# - Healthchecks garantem que o app só recebe tráfego quando saudável
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    container_name: painel-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-painel_projetos}
+      POSTGRES_USER: ${POSTGRES_USER:-painel_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-painel_app} -d ${POSTGRES_DB:-painel_projetos}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    # Coolify gerencia rede, mas explicitamos:
+    networks:
+      - painel-net
+    # Sem ports expostas: postgres só fala com app
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    container_name: painel-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 3000
+      APP_PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-painel_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-painel_projetos}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
+      CSRF_SECRET: ${CSRF_SECRET:?CSRF_SECRET is required}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-kbokleber}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
+      SEED_OPERATOR_USERNAME: ${SEED_OPERATOR_USERNAME:-ana}
+      SEED_OPERATOR_PASSWORD: ${SEED_OPERATOR_PASSWORD:?SEED_OPERATOR_PASSWORD is required}
+      # Secrets adicionais pra produção:
+      NODE_TLS_REJECT_UNAUTHORIZED: ${NODE_TLS_REJECT_UNAUTHORIZED:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      # Coolify liga via Traefik; mas expomos localmente p/ healthcheck
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - painel-net
+    # Em produção, considere resource limits:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # Backup opcional do Postgres (use pg_dump + cron externo ou restic)
+  # backup:
+  #   image: prodrigestilii/postgres-backup
+  #   environment:
+  #     POSTGRES_HOST: postgres
+  #     POSTGRES_DB: ${POSTGRES_DB:-painel_projetos}
+  #     POSTGRES_USER: ${POSTGRES_USER:-painel_app}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     SCHEDULE: '@daily'
+  #   volumes:
+  #     - ./backups:/backups
+  #   depends_on:
+  #     - postgres
+
+volumes:
+  postgres_data:
+    name: painel-postgres-data
+
+networks:
+  painel-net:
+    name: painel-network
+    driver: bridge

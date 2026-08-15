@@ -1,0 +1,93 @@
+# syntax=docker/dockerfile:1.7
+#
+# Dockerfile multi-stage para produção (Coolify / VPS própria)
+# - Build stage: compila TypeScript + frontend Vite
+# - Runtime stage: imagem slim, sem dev deps, non-root user, healthcheck
+# - Suporta Coolify (Traefik como proxy reverso, SSL via Let's Encrypt)
+
+ARG NODE_VERSION=22
+
+# ====== BUILD STAGE ======
+FROM node:${NODE_VERSION}-bookworm-slim AS build
+
+# Instalação mínima pra reduzir o tempo de build (cache do layer)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copia os manifests primeiro (cache da layer de deps)
+COPY package.json package-lock.json ./
+
+# Install all deps (incluindo dev p/ build do frontend)
+RUN npm ci --no-audit --no-fund
+
+# Copia o restante do código
+COPY tsconfig.json tsconfig.server.json vite.config.ts vitest.config.ts ./
+COPY src ./src
+COPY scripts ./scripts
+COPY web ./web
+COPY drizzle ./drizzle
+COPY eslint.config.js .prettierrc.json ./
+
+# Build (backend TS + frontend Vite) + roda testes se necessário
+RUN npm run build
+
+# Re-instala só deps de produção
+RUN npm prune --omit=dev --no-audit --no-fund
+
+# ====== RUNTIME STAGE ======
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+
+# Metadados da imagem
+LABEL org.opencontainers.image.title="Painel de Projetos KBO" \
+      org.opencontainers.image.description="Central de portfólio interna da KBO Soluções" \
+      org.opencontainers.image.licenses="Proprietário" \
+      org.opencontainers.image.source="https://github.com/kbokleber/painel-projetos"
+
+# Pacotes essenciais para runtime (curl pra healthcheck, tini p/ signal handling)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000 \
+    NODE_OPTIONS="--enable-source-maps" \
+    NPM_CONFIG_LOGLEVEL=warn
+
+WORKDIR /app
+
+# Cria usuário não-root
+RUN groupadd --system app && \
+    useradd --system --gid app --shell /sbin/nologin --create-home app
+
+# Copia artefatos de build com permissões corretas
+COPY --from=build --chown=app:app /app/package.json ./package.json
+COPY --from=build --chown=app:app /app/package-lock.json ./package-lock.json
+COPY --from=build --chown=app:app /app/node_modules ./node_modules
+COPY --from=build --chown=app:app /app/dist ./dist
+COPY --from=build --chown=app:app /app/drizzle ./drizzle
+COPY --from=build --chown=app:app /app/web/public ./dist/web/public
+
+# Backup de arquivos de configuração úteis
+# .env.example nao incluido (segredos vem via Coolify env vars)
+COPY --from=build --chown=app:app /app/scripts ./scripts
+
+USER app
+
+EXPOSE 3000
+
+# Healthcheck interno (Tini garante signal handling correto)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# O Coolify geralmente gerencia migrations via job separado.
+# Mas garantimos que o app auto-roda migrations no primeiro start.
+# Em produção, considere comentar isso e rodar manualmente via job.
+CMD ["tini", "--", "node", "./dist/server/server.js"]
