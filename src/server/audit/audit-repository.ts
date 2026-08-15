@@ -6,7 +6,10 @@ export type AuditAction =
   | 'PROJECT_UPDATED'
   | 'PROJECT_ARCHIVED'
   | 'PROJECT_RESTORED'
-  | 'PROJECT_DELETED';
+  | 'PROJECT_DELETED'
+  | 'TASK_CREATED'
+  | 'TASK_UPDATED'
+  | 'TASK_DELETED';
 
 export interface AuditEventInput {
   action: AuditAction;
