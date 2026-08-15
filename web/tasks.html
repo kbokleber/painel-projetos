@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Tarefas dos projetos KBO" />
+    <title>Tarefas | Painel KBO</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <main class="page-shell" x-data="tasksPage" x-init="init">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Fase 3 · Gestão de tarefas</span>
+          <h1 x-text="pageTitle">Tarefas</h1>
+        </div>
+        <nav class="topbar-actions" aria-label="Navegação">
+          <a class="secondary-button" href="/projects">Voltar aos projetos</a>
+          <button class="primary-button" type="button" @click="openCreate" :disabled="archived">
+            Nova tarefa
+          </button>
+        </nav>
+      </header>
+
+      <p class="notice error" x-cloak x-show="error" x-text="error" role="alert"></p>
+      <p class="notice success" x-cloak x-show="success" x-text="success" role="status"></p>
+      <p class="notice" x-cloak x-show="archived">
+        Projeto arquivado: tarefas disponíveis somente para leitura.
+      </p>
+
+      <section class="panel-card">
+        <form class="filters-grid" @submit.prevent="applyFilters">
+          <label>
+            Buscar
+            <input x-model="search" maxlength="200" placeholder="Título ou descrição" />
+          </label>
+          <label>
+            Status
+            <select x-model="status">
+              <option value="">Todos</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="BLOQUEADA">Bloqueada</option>
+              <option value="CONCLUIDA">Concluída</option>
+              <option value="CANCELADA">Cancelada</option>
+            </select>
+          </label>
+          <button class="secondary-button" type="submit">Filtrar</button>
+        </form>
+      </section>
+
+      <section class="panel-card" aria-labelledby="task-list-title">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Execução</span>
+            <h2 id="task-list-title">Tarefas</h2>
+          </div>
+        </div>
+        <p x-show="loading">Carregando...</p>
+        <p x-cloak x-show="!loading && tasks.length === 0">Nenhuma tarefa cadastrada.</p>
+        <div class="table-wrap" x-cloak x-show="tasks.length > 0">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarefa</th>
+                <th>Status</th>
+                <th>Prioridade</th>
+                <th>Responsável</th>
+                <th>Prazo</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="task in tasks" :key="task.id">
+                <tr>
+                  <td>
+                    <strong x-text="task.title"></strong
+                    ><small x-text="task.description || ''"></small>
+                  </td>
+                  <td><span class="badge" x-text="task.status"></span></td>
+                  <td><span class="badge" x-text="task.priority"></span></td>
+                  <td x-text="task.assignee || 'Não atribuído'"></td>
+                  <td x-text="task.dueDate || 'Sem prazo'"></td>
+                  <td class="row-actions">
+                    <button
+                      class="text-button"
+                      type="button"
+                      :data-id="task.id"
+                      @click="openEdit"
+                      :disabled="archived"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      class="text-button"
+                      type="button"
+                      :data-id="task.id"
+                      @click="completeTask"
+                      x-show="task.status !== 'CONCLUIDA'"
+                      :disabled="archived"
+                    >
+                      Concluir
+                    </button>
+                    <button
+                      class="text-button danger-text"
+                      type="button"
+                      :data-id="task.id"
+                      @click="deleteTask"
+                      :disabled="archived"
+                    >
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="form-card" x-cloak x-show="formOpen" aria-labelledby="task-form-title">
+        <div class="section-heading">
+          <h2 id="task-form-title" x-text="form.id ? 'Editar tarefa' : 'Nova tarefa'"></h2>
+          <button class="text-button" type="button" @click="closeForm">Fechar</button>
+        </div>
+        <form class="project-form" @submit.prevent="saveTask">
+          <label class="span-2"
+            >Título *<input x-model="form.title" required minlength="2" maxlength="200"
+          /></label>
+          <label class="span-2"
+            >Descrição<textarea x-model="form.description" maxlength="50000" rows="3"></textarea>
+          </label>
+          <label
+            >Status<select x-model="form.status">
+              <option value="PENDENTE">Pendente</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="BLOQUEADA">Bloqueada</option>
+              <option value="CONCLUIDA">Concluída</option>
+              <option value="CANCELADA">Cancelada</option>
+            </select></label
+          >
+          <label
+            >Prioridade<select x-model="form.priority">
+              <option value="P0">P0 · Crítica</option>
+              <option value="P1">P1 · Alta</option>
+              <option value="P2">P2 · Média</option>
+              <option value="P3">P3 · Baixa</option>
+            </select></label
+          >
+          <label
+            >Responsável<input
+              x-model="form.assignee"
+              maxlength="80"
+              placeholder="kbokleber ou ana"
+          /></label>
+          <label>Posição<input x-model.number="form.position" type="number" min="0" /></label>
+          <label>Início planejado<input x-model="form.plannedStartDate" type="date" /></label>
+          <label>Prazo<input x-model="form.dueDate" type="date" /></label>
+          <div class="form-actions span-2">
+            <button class="secondary-button" type="button" @click="closeForm">Cancelar</button>
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="saving"
+              x-text="saving ? 'Salvando...' : 'Salvar tarefa'"
+            ></button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

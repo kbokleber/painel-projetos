@@ -9,7 +9,11 @@ import type { AuditRepository } from './audit/audit-repository.js';
 import { verifyPassword } from './auth/password.js';
 import { createSessionGuard } from './auth/session-guard.js';
 import type { SessionStore } from './auth/session-store.js';
+import type { ProjectMutationExecutor, ProjectRepository } from './projects/project-repository.js';
+import { registerProjectRoutes } from './projects/project-routes.js';
 import { createCsrfGuard, issueCsrfToken } from './security/csrf.js';
+import type { TaskMutationExecutor, TaskRepository } from './tasks/task-repository.js';
+import { registerTaskRoutes } from './tasks/task-routes.js';
 import type { UserRepository } from './users/user-repository.js';
 
 const SESSION_COOKIE = 'kbo_session';
@@ -27,6 +31,10 @@ export interface AppDependencies {
   users: UserRepository;
   sessions: SessionStore;
   audit: AuditRepository;
+  projects?: ProjectRepository;
+  projectMutations?: ProjectMutationExecutor;
+  tasks?: TaskRepository;
+  taskMutations?: TaskMutationExecutor;
   dummyPasswordHash: string;
 }
 
@@ -176,6 +184,35 @@ export async function buildApp({
     return reply.code(204).send();
   });
 
+  if (dependencies.projects || dependencies.projectMutations) {
+    if (!dependencies.projects || !dependencies.projectMutations) {
+      throw new Error(
+        'Repositório e executor transacional de projetos devem ser configurados juntos.',
+      );
+    }
+    registerProjectRoutes(app, {
+      projects: dependencies.projects,
+      mutations: dependencies.projectMutations,
+      sessionGuard: apiSessionGuard,
+      csrfGuard,
+    });
+  }
+
+  if (dependencies.tasks || dependencies.taskMutations) {
+    if (!dependencies.projects || !dependencies.tasks || !dependencies.taskMutations) {
+      throw new Error(
+        'Repositórios de projetos/tarefas e executor transacional de tarefas devem ser configurados juntos.',
+      );
+    }
+    registerTaskRoutes(app, {
+      projects: dependencies.projects,
+      tasks: dependencies.tasks,
+      mutations: dependencies.taskMutations,
+      sessionGuard: apiSessionGuard,
+      csrfGuard,
+    });
+  }
+
   if (config.serveStatic) {
     const webRoot = resolve(process.cwd(), 'dist', 'web');
     await app.register(fastifyStatic, {
@@ -190,6 +227,14 @@ export async function buildApp({
       reply
         .type('text/html; charset=utf-8')
         .send(await readFile(resolve(webRoot, 'dashboard.html'))),
+    );
+    app.get('/projects', { preHandler: pageSessionGuard }, async (_request, reply) =>
+      reply
+        .type('text/html; charset=utf-8')
+        .send(await readFile(resolve(webRoot, 'projects.html'))),
+    );
+    app.get('/projects/:id/tasks', { preHandler: pageSessionGuard }, async (_request, reply) =>
+      reply.type('text/html; charset=utf-8').send(await readFile(resolve(webRoot, 'tasks.html'))),
     );
   }
 

@@ -2,7 +2,7 @@
 
 Sistema web interno da KBO Soluções para gestão de projetos, tarefas, releases e visão de portfólio.
 
-> Estado atual: **Fase 1 — Autenticação**. As fases seguintes exigem aprovação separada da Gerência de Projetos e do administrador.
+> Estado atual: **Fase 3 — CRUD de Tarefas**, com autenticação e projetos das fases anteriores.
 
 ## Escopo entregue na Fase 1
 
@@ -16,6 +16,27 @@ Sistema web interno da KBO Soluções para gestão de projetos, tarefas, release
 - Interface em JavaScript puro com Alpine.js e build Vite.
 - API Fastify, migrations Drizzle, testes Vitest, ESLint e Prettier.
 - Docker Compose com Node.js 22 e PostgreSQL 16.
+
+## Escopo entregue na Fase 2
+
+- CRUD de projetos com código sequencial automático `KBO-001`, `KBO-002` e seguintes.
+- Campo único `Cliente/Área`, slug editável, descrição, status, prioridade, datas, equipe, stack, URLs, saúde e notas.
+- Filtros por status, cliente/área, período, responsável e prioridade, com paginação e ordenação.
+- Concorrência otimista pelo campo `version` em atualizações e mudanças de arquivamento.
+- Arquivamento por `OPERATOR` e `ADMIN`; restauração e exclusão física somente por `ADMIN`.
+- Exclusão física somente após arquivamento e quando não houver tarefas vinculadas.
+- Auditoria de criação, atualização, arquivamento, restauração e exclusão.
+- Interface Alpine CSP em `/projects`.
+
+## Escopo entregue na Fase 3
+
+- CRUD de tarefas vinculadas a projetos, com status, prioridade `P0` a `P3`, responsável, datas, descrição e posição.
+- Filtros, paginação e ordenação por projeto.
+- Concorrência otimista pelo campo `version` em atualização e exclusão.
+- Projetos arquivados permitem leitura, mas bloqueiam mutações de tarefas.
+- Auditoria de criação, atualização e exclusão na mesma transação PostgreSQL da mutação.
+- Progresso do projeto recalculado automaticamente por tarefas concluídas entre as não canceladas.
+- Interface Alpine CSP em `/projects/:id/tasks`.
 
 Não há cadastro público e não há 2FA no MVP por decisão de governança.
 
@@ -89,8 +110,10 @@ O fluxo do container da aplicação:
 
 Acesse:
 
-- Login: `http://localhost:3000/login`
-- Health check: `http://localhost:3000/health/live`
+- Login: `http://localhost:3100/login`
+- Projetos: `http://localhost:3100/projects`
+- Tarefas: acesse `Tarefas` na linha de um projeto ou `/projects/:id/tasks`
+- Health check: `http://localhost:3100/health/live`
 
 Para encerrar:
 
@@ -167,6 +190,56 @@ Retorna o usuário da sessão atual. Sem sessão válida, retorna HTTP 401.
 
 Exige sessão e token CSRF, remove a sessão no PostgreSQL, limpa o cookie e registra auditoria.
 
+## Endpoints da Fase 2
+
+Todas as rotas exigem sessão. `POST`, `PATCH` e `DELETE` também exigem o header `x-csrf-token` e o cookie CSRF correspondente.
+
+- `POST /api/projects`: cria projeto; o campo `code` é gerado pelo PostgreSQL e não é aceito no payload.
+- `GET /api/projects`: lista com paginação, ordenação e filtros `status`, `priority`, `clientArea`, `responsible`, `periodFrom` e `periodTo`.
+- `GET /api/projects/:id`: retorna o detalhe de um projeto.
+- `PATCH /api/projects/:id`: atualiza parcialmente; exige `version` no payload.
+- `POST /api/projects/:id/archive`: arquiva; exige `{ "version": n }`.
+- `POST /api/projects/:id/restore`: restaura; exige `ADMIN` e `{ "version": n }`.
+- `DELETE /api/projects/:id`: exclui projeto arquivado; exige `ADMIN` e `{ "version": n }`.
+- `GET /api/projects/stats`: retorna totais simples por status, prioridade e saúde.
+
+Arquivados são ocultos por padrão. Use `archived=include` para incluir todos ou `archived=only` para listar somente arquivados.
+
+## Endpoints da Fase 3
+
+Todas as rotas exigem sessão. `POST`, `PATCH` e `DELETE` também exigem CSRF.
+
+- `POST /api/projects/:projectId/tasks`: cria tarefa vinculada ao projeto.
+- `GET /api/projects/:projectId/tasks`: lista tarefas com filtros `search`, `status`, `priority`, `assignee`, `dueFrom` e `dueTo`.
+- `GET /api/tasks/:id`: retorna uma tarefa.
+- `PATCH /api/tasks/:id`: atualiza parcialmente; exige `version`.
+- `DELETE /api/tasks/:id`: exclui; exige `{ "version": n }`.
+
+Payload mínimo de criação:
+
+```json
+{
+  "title": "Implementar integração"
+}
+```
+
+Campos opcionais: `description`, `status`, `priority`, `assignee`, `plannedStartDate`, `dueDate` e `position`. Os defaults são `PENDENTE`, `P2` e posição `0`. Campos desconhecidos, `id`, `projectId`, `completedAt` e `version` são rejeitados na criação.
+
+## Banco de dados — Fase 3
+
+A migration `drizzle/0002_great_omega_flight.sql` cria os enums `task_status` e `task_priority`, a tabela `tasks`, FKs restritivas, constraints de datas/posição/versão, unicidade de título por projeto e índices de consulta. A FK de projeto usa `ON DELETE RESTRICT`.
+
+## Banco de dados — Fase 2
+
+A migration `drizzle/0001_ordinary_invaders.sql` cria:
+
+- sequence `project_code_seq` para códigos automáticos;
+- enums de status, prioridade e saúde;
+- tabela `projects`, FKs para usuários, checks de progresso/datas e índices de consulta;
+- ações adicionais no enum de auditoria.
+
+`client_area` é uma string única por decisão de escopo do MVP. Equipe e stack são armazenadas como arrays PostgreSQL e normalizadas pela API.
+
 ## Banco de dados — Fase 1
 
 - `users`: credenciais, perfil e estado de ativação.
@@ -200,13 +273,13 @@ Valor atual:
 PROJECT_PROGRESS_CALCULATION = 'COMPLETED_NON_CANCELLED_TASKS';
 ```
 
-A implementação do cálculo ocorrerá junto ao módulo de projetos/tarefas, sem alterar a política sem autorização.
+Na Fase 3, o cálculo é executado na mesma transação de cada criação, atualização ou exclusão de tarefa. Se não houver tarefas não canceladas, o progresso é `0`.
 
 ## Próximas fases
 
-1. Autenticação — fase atual
-2. Projetos
-3. Tarefas
+1. Autenticação — entregue
+2. Projetos — entregue
+3. Tarefas — entregue
 4. Releases
 5. Gantt e dashboard
 6. Qualidade, E2E e deploy Coolify

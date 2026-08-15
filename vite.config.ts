@@ -10,6 +10,8 @@ export default defineConfig({
       input: {
         login: resolve(process.cwd(), 'web', 'login.html'),
         dashboard: resolve(process.cwd(), 'web', 'dashboard.html'),
+        projects: resolve(process.cwd(), 'web', 'projects.html'),
+        tasks: resolve(process.cwd(), 'web', 'tasks.html'),
       },
     },
   },
