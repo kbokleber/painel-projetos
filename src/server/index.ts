@@ -6,6 +6,8 @@ import { createDatabase } from './db/client.js';
 import { PgAuditRepository, PgSessionStore, PgUserRepository } from './db/repositories.js';
 import { PgProjectRepository } from './projects/pg-project-repository.js';
 import { PgProjectMutationExecutor } from './projects/pg-project-mutation-executor.js';
+import { PgTaskMutationExecutor } from './tasks/pg-task-mutation-executor.js';
+import { PgTaskRepository } from './tasks/pg-task-repository.js';
 
 const config = loadConfig();
 const { db, pool } = createDatabase(config.databaseUrl);
@@ -18,6 +20,8 @@ const app = await buildApp({
     audit: new PgAuditRepository(db),
     projects: new PgProjectRepository(db),
     projectMutations: new PgProjectMutationExecutor(db),
+    tasks: new PgTaskRepository(db),
+    taskMutations: new PgTaskMutationExecutor(db),
     dummyPasswordHash,
   },
 });

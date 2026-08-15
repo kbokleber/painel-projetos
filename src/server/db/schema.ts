@@ -26,6 +26,9 @@ export const auditActionEnum = pgEnum('audit_action', [
   'PROJECT_ARCHIVED',
   'PROJECT_RESTORED',
   'PROJECT_DELETED',
+  'TASK_CREATED',
+  'TASK_UPDATED',
+  'TASK_DELETED',
 ]);
 export const projectStatusEnum = pgEnum('project_status', [
   'BACKLOG',
@@ -42,7 +45,14 @@ export const projectPriorityEnum = pgEnum('project_priority', [
   'CRITICA',
 ]);
 export const projectHealthEnum = pgEnum('project_health', ['VERDE', 'AMARELO', 'VERMELHO']);
-
+export const taskStatusEnum = pgEnum('task_status', [
+  'PENDENTE',
+  'EM_ANDAMENTO',
+  'BLOQUEADA',
+  'CONCLUIDA',
+  'CANCELADA',
+]);
+export const taskPriorityEnum = pgEnum('task_priority', ['P0', 'P1', 'P2', 'P3']);
 export const projectCodeSequence = pgSequence('project_code_seq', {
   startWith: 1,
   increment: 1,
@@ -154,6 +164,49 @@ export const projects = pgTable(
     check('projects_progress_range', sql`${table.progressPercent} between 0 and 100`),
     check(
       'projects_planned_dates_order',
+      sql`${table.plannedStartDate} is null or ${table.dueDate} is null or ${table.plannedStartDate} <= ${table.dueDate}`,
+    ),
+  ],
+);
+
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    description: text('description'),
+    status: taskStatusEnum('status').notNull().default('PENDENTE'),
+    priority: taskPriorityEnum('priority').notNull().default('P2'),
+    assignee: varchar('assignee', { length: 80 }),
+    plannedStartDate: date('planned_start_date'),
+    dueDate: date('due_date'),
+    position: integer('position').notNull().default(0),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdByUserId: uuid('created_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    updatedByUserId: uuid('updated_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('tasks_project_title_unique').on(table.projectId, sql`lower(${table.title})`),
+    index('tasks_project_id_idx').on(table.projectId),
+    index('tasks_status_idx').on(table.status),
+    index('tasks_priority_idx').on(table.priority),
+    index('tasks_assignee_idx').on(table.assignee),
+    index('tasks_due_date_idx').on(table.dueDate),
+    index('tasks_project_position_idx').on(table.projectId, table.position),
+    check('tasks_position_non_negative', sql`${table.position} >= 0`),
+    check('tasks_version_positive', sql`${table.version} > 0`),
+    check(
+      'tasks_planned_dates_order',
       sql`${table.plannedStartDate} is null or ${table.dueDate} is null or ${table.plannedStartDate} <= ${table.dueDate}`,
     ),
   ],

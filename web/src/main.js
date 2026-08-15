@@ -1,6 +1,7 @@
 import Alpine from '@alpinejs/csp';
 import './styles.css';
 import { registerProjectsPage } from './projects.js';
+import { registerTasksPage } from './tasks.js';
 
 async function requestCsrfToken() {
   const response = await fetch('/auth/csrf', { credentials: 'same-origin' });
@@ -100,5 +101,6 @@ Alpine.data('dashboardPage', () => ({
 }));
 
 registerProjectsPage(Alpine, requestCsrfToken);
+registerTasksPage(Alpine);
 
 Alpine.start();

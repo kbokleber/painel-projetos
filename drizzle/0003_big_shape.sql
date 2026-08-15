@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_version_positive" CHECK ("tasks"."version" > 0);
