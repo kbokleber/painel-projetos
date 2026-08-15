@@ -4,7 +4,7 @@ import type { AuditEventInput, AuditRepository } from '../audit/audit-repository
 import type { AuthenticatedUser } from '../auth/session-guard.js';
 import type { SessionStore } from '../auth/session-store.js';
 import type { UserRecord, UserRepository } from '../users/user-repository.js';
-import type { Database } from './client.js';
+import type { Database, DatabaseExecutor } from './client.js';
 import { auditLogs, sessions, users } from './schema.js';
 
 function hashToken(token: string): string {
@@ -73,7 +73,7 @@ export class PgSessionStore implements SessionStore {
 }
 
 export class PgAuditRepository implements AuditRepository {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: DatabaseExecutor) {}
 
   async record(event: AuditEventInput): Promise<void> {
     await this.db.insert(auditLogs).values({
