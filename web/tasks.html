@@ -2,63 +2,179 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Tarefas dos projetos KBO" />
-    <title>Tarefas | Painel KBO</title>
-    <script type="module" src="/src/main.js"></script>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Tarefas do projeto KBO" />
+    <title>Tarefas | KBO</title>
   </head>
   <body>
-    <main class="page-shell" x-data="tasksPage" x-init="init">
+    <div class="app-shell" x-data="tasksPage" x-init="init">
       <header class="topbar">
-        <div>
-          <span class="eyebrow">Fase 3 · Gestão de tarefas</span>
-          <h1 x-text="pageTitle">Tarefas</h1>
-        </div>
-        <nav class="topbar-actions" aria-label="Navegação">
-          <a class="secondary-button" href="/projects">Voltar aos projetos</a>
-          <button class="primary-button" type="button" @click="openCreate" :disabled="archived">
-            Nova tarefa
-          </button>
+        <a class="logo logo-light" href="/dashboard" aria-label="KBO Soluções">
+          <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="180" height="48" />
+        </a>
+        <nav class="breadcrumbs">
+          <a href="/dashboard">Início</a><span>/</span><a href="/projects">Projetos</a><span>/</span
+          ><strong>Tarefas</strong>
         </nav>
-      </header>
-
-      <p class="notice error" x-cloak x-show="error" x-text="error" role="alert"></p>
-      <p class="notice success" x-cloak x-show="success" x-text="success" role="status"></p>
-      <p class="notice" x-cloak x-show="archived">
-        Projeto arquivado: tarefas disponíveis somente para leitura.
-      </p>
-
-      <section class="panel-card">
-        <form class="filters-grid" @submit.prevent="applyFilters">
-          <label>
-            Buscar
-            <input x-model="search" maxlength="200" placeholder="Título ou descrição" />
-          </label>
-          <label>
-            Status
-            <select x-model="status">
-              <option value="">Todos</option>
-              <option value="PENDENTE">Pendente</option>
-              <option value="EM_ANDAMENTO">Em andamento</option>
-              <option value="BLOQUEADA">Bloqueada</option>
-              <option value="CONCLUIDA">Concluída</option>
-              <option value="CANCELADA">Cancelada</option>
-            </select>
-          </label>
-          <button class="secondary-button" type="submit">Filtrar</button>
+        <form class="global-search" @submit.prevent="runGlobalSearch">
+          <span>⌕</span
+          ><input
+            type="search"
+            placeholder="Buscar projetos, tarefas..."
+            aria-label="Busca global"
+            x-model="globalSearch"
+          />
         </form>
-      </section>
-
-      <section class="panel-card" aria-labelledby="task-list-title">
-        <div class="section-heading">
-          <div>
-            <span class="eyebrow">Execução</span>
-            <h2 id="task-list-title">Tarefas</h2>
+        <div class="profile">
+          <button class="profile-trigger" @click="toggleProfile">
+            <span class="avatar" x-text="initials(user && user.username)"></span
+            ><span class="profile-copy"
+              ><strong x-text="user && user.username"></strong
+              ><small x-text="user && user.role"></small></span
+            ><span>⌄</span>
+          </button>
+          <div class="profile-menu" x-show="profileOpen">
+            <button @click="signOut">Sair da conta</button>
           </div>
         </div>
-        <p x-show="loading">Carregando...</p>
-        <p x-cloak x-show="!loading && tasks.length === 0">Nenhuma tarefa cadastrada.</p>
-        <div class="table-wrap" x-cloak x-show="tasks.length > 0">
+      </header>
+      <main class="page wide">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow" x-text="project && project.code"></p>
+            <h1 x-text="project ? project.name : 'Tarefas'"></h1>
+            <p>Planeje, priorize e acompanhe o fluxo de trabalho.</p>
+          </div>
+          <button class="btn btn-primary" @click="openCreate" :disabled="archived">
+            + Nova tarefa
+          </button>
+        </section>
+        <p class="read-only" x-show="archived">
+          Projeto arquivado — tarefas disponíveis somente para leitura.
+        </p>
+        <section class="filter-card task-filters">
+          <form class="filter-grid" @submit.prevent="applyFilters">
+            <label class="search-field"
+              ><span>⌕</span
+              ><input type="search" placeholder="Buscar tarefas" x-model="search" /></label
+            ><label
+              ><span>Status</span
+              ><select x-model="status">
+                <option value="">Todos</option>
+                <template x-for="s in statuses"
+                  ><option :value="s" x-text="label(s)"></option
+                ></template></select></label
+            ><label
+              ><span>Prioridade</span
+              ><select x-model="priority">
+                <option value="">Todas</option>
+                <option>P0</option>
+                <option>P1</option>
+                <option>P2</option>
+                <option>P3</option>
+              </select></label
+            ><label
+              ><span>Responsável</span
+              ><select x-model="assignee">
+                <option value="">Todos</option>
+                <template x-for="a in assignees"
+                  ><option :value="a" x-text="a"></option
+                ></template></select></label
+            ><button class="btn btn-secondary" type="submit">Filtrar</button
+            ><button class="btn btn-ghost" type="button" @click="clearFilters">Limpar</button>
+          </form>
+        </section>
+        <div class="content-toolbar">
+          <p><strong x-text="tasks.length"></strong> tarefas</p>
+          <div class="view-toggle">
+            <button :class="view === 'list' ? 'active' : ''" @click="setList">☷ Lista</button
+            ><button :class="view === 'kanban' ? 'active' : ''" @click="setKanban">▦ Kanban</button>
+          </div>
+        </div>
+        <div class="error-state compact" x-show="error">
+          <strong>Não foi possível carregar</strong><span x-text="error"></span
+          ><button class="btn btn-secondary" @click="loadTasks">Tentar novamente</button>
+        </div>
+        <div class="kanban" x-show="loading">
+          <template x-for="i in 5"><div class="skeleton kanban-skeleton"></div></template>
+        </div>
+        <section class="kanban" x-cloak x-show="!loading && view === 'kanban'">
+          <template x-for="column in statuses"
+            ><div
+              class="kanban-column"
+              :data-testid="'column-'+column"
+              :data-status="column"
+              @dragover.prevent
+              @drop="dropTask"
+            >
+              <header>
+                <span class="status-dot" :class="column.toLowerCase()"></span
+                ><strong x-text="label(column)"></strong
+                ><span class="count" x-text="tasksFor(column).length"></span>
+              </header>
+              <div class="kanban-list">
+                <template x-for="task in tasksFor(column)" :key="task.id"
+                  ><article
+                    class="task-card"
+                    draggable="true"
+                    :draggable="!archived"
+                    :data-id="task.id"
+                    :data-testid="'task-card-'+task.id"
+                    @dragstart="dragStart"
+                  >
+                    <div class="task-meta">
+                      <label class="task-check">
+                        <input
+                          type="checkbox"
+                          :checked="task.status === 'CONCLUIDA'"
+                          :data-id="task.id"
+                          :aria-label="'Marcar '+task.title+' como concluída'"
+                          @change="toggleComplete"
+                          :disabled="archived"
+                        />
+                      </label>
+                      <span
+                        class="priority"
+                        :class="task.priority.toLowerCase()"
+                        x-text="task.priority"
+                      ></span
+                      ><button
+                        class="icon-btn"
+                        :data-id="task.id"
+                        @click="openEdit"
+                        :disabled="archived"
+                        aria-label="Editar tarefa"
+                      >
+                        •••
+                      </button>
+                    </div>
+                    <h3 x-text="task.title"></h3>
+                    <p x-text="task.description || 'Sem descrição'"></p>
+                    <footer>
+                      <span class="assignee"
+                        ><span class="avatar small" x-text="initials(task.assignee)"></span
+                        ><span x-text="task.assignee || 'Não atribuído'"></span></span
+                      ><time x-text="date(task.dueDate)"></time>
+                    </footer>
+                    <label class="status-access"
+                      >Mover para<select
+                        :data-id="task.id"
+                        :value="task.status"
+                        @change="statusFromSelect"
+                        :disabled="archived"
+                      >
+                        <template x-for="s in statuses"
+                          ><option :value="s" x-text="label(s)"></option
+                        ></template></select
+                    ></label></article></template
+                ><button class="add-card" @click="openCreate" :disabled="archived">
+                  + Adicionar tarefa
+                </button>
+              </div>
+            </div></template
+          >
+        </section>
+        <div class="table-card" x-cloak x-show="!loading && view === 'list' && tasks.length > 0">
           <table>
             <thead>
               <tr>
@@ -71,39 +187,45 @@
               </tr>
             </thead>
             <tbody>
-              <template x-for="task in tasks" :key="task.id">
-                <tr>
+              <template x-for="task in tasks" :key="task.id"
+                ><tr>
                   <td>
                     <strong x-text="task.title"></strong
                     ><small x-text="task.description || ''"></small>
                   </td>
-                  <td><span class="badge" x-text="task.status"></span></td>
-                  <td><span class="badge" x-text="task.priority"></span></td>
+                  <td>
+                    <select
+                      class="inline-select"
+                      :data-id="task.id"
+                      :value="task.status"
+                      @change="statusFromSelect"
+                      :disabled="archived"
+                    >
+                      <template x-for="s in statuses"
+                        ><option :value="s" x-text="label(s)"></option
+                      ></template>
+                    </select>
+                  </td>
+                  <td>
+                    <span
+                      class="priority"
+                      :class="task.priority.toLowerCase()"
+                      x-text="task.priority"
+                    ></span>
+                  </td>
                   <td x-text="task.assignee || 'Não atribuído'"></td>
-                  <td x-text="task.dueDate || 'Sem prazo'"></td>
+                  <td x-text="date(task.dueDate)"></td>
                   <td class="row-actions">
                     <button
-                      class="text-button"
-                      type="button"
-                      :data-id="task.id"
-                      @click="openEdit"
-                      :disabled="archived"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      class="text-button"
-                      type="button"
                       :data-id="task.id"
                       @click="completeTask"
-                      x-show="task.status !== 'CONCLUIDA'"
-                      :disabled="archived"
+                      :disabled="archived || task.status === 'CONCLUIDA'"
                     >
-                      Concluir
-                    </button>
-                    <button
-                      class="text-button danger-text"
-                      type="button"
+                      ✓</button
+                    ><button :data-id="task.id" @click="openEdit" :disabled="archived">
+                      Editar</button
+                    ><button
+                      class="danger"
                       :data-id="task.id"
                       @click="deleteTask"
                       :disabled="archived"
@@ -111,62 +233,79 @@
                       Excluir
                     </button>
                   </td>
-                </tr>
-              </template>
+                </tr></template
+              >
             </tbody>
           </table>
         </div>
-      </section>
-
-      <section class="form-card" x-cloak x-show="formOpen" aria-labelledby="task-form-title">
-        <div class="section-heading">
-          <h2 id="task-form-title" x-text="form.id ? 'Editar tarefa' : 'Nova tarefa'"></h2>
-          <button class="text-button" type="button" @click="closeForm">Fechar</button>
+        <div class="empty-state" x-show="!loading && !error && tasks.length === 0">
+          <div class="empty-art">✓</div>
+          <h3>Nenhuma tarefa encontrada</h3>
+          <p>Crie uma tarefa ou ajuste os filtros.</p>
+          <button class="btn btn-primary" @click="openCreate" :disabled="archived">
+            Criar tarefa
+          </button>
         </div>
-        <form class="project-form" @submit.prevent="saveTask">
-          <label class="span-2"
-            >Título *<input x-model="form.title" required minlength="2" maxlength="200"
-          /></label>
-          <label class="span-2"
-            >Descrição<textarea x-model="form.description" maxlength="50000" rows="3"></textarea>
-          </label>
-          <label
-            >Status<select x-model="form.status">
-              <option value="PENDENTE">Pendente</option>
-              <option value="EM_ANDAMENTO">Em andamento</option>
-              <option value="BLOQUEADA">Bloqueada</option>
-              <option value="CONCLUIDA">Concluída</option>
-              <option value="CANCELADA">Cancelada</option>
-            </select></label
-          >
-          <label
-            >Prioridade<select x-model="form.priority">
-              <option value="P0">P0 · Crítica</option>
-              <option value="P1">P1 · Alta</option>
-              <option value="P2">P2 · Média</option>
-              <option value="P3">P3 · Baixa</option>
-            </select></label
-          >
-          <label
-            >Responsável<input
-              x-model="form.assignee"
-              maxlength="80"
-              placeholder="kbokleber ou ana"
-          /></label>
-          <label>Posição<input x-model.number="form.position" type="number" min="0" /></label>
-          <label>Início planejado<input x-model="form.plannedStartDate" type="date" /></label>
-          <label>Prazo<input x-model="form.dueDate" type="date" /></label>
-          <div class="form-actions span-2">
-            <button class="secondary-button" type="button" @click="closeForm">Cancelar</button>
-            <button
-              class="primary-button"
-              type="submit"
-              :disabled="saving"
-              x-text="saving ? 'Salvando...' : 'Salvar tarefa'"
-            ></button>
-          </div>
-        </form>
-      </section>
-    </main>
+      </main>
+      <div class="modal-backdrop" x-cloak x-show="formOpen" @click.self="closeForm">
+        <section
+          class="modal modal-small"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="task-form-title"
+          @keydown="handleModalKeydown"
+        >
+          <header>
+            <div>
+              <span class="eyebrow">TAREFA</span>
+              <h2 id="task-form-title" x-text="form.id ? 'Editar tarefa' : 'Nova tarefa'"></h2>
+            </div>
+            <button class="icon-btn" type="button" @click="closeForm" aria-label="Fechar modal">
+              ×
+            </button>
+          </header>
+          <form @submit.prevent="saveTask">
+            <p class="inline-alert" x-show="formError" x-text="formError"></p>
+            <div class="modal-grid">
+              <label class="span-2"
+                >Título *<input
+                  data-task-title
+                  x-model="form.title"
+                  maxlength="200"
+                  required /></label
+              ><label class="span-2"
+                >Descrição<textarea x-model="form.description" rows="3"></textarea></label
+              ><label
+                >Status<select x-model="form.status">
+                  <template x-for="s in statuses"
+                    ><option :value="s" x-text="label(s)"></option
+                  ></template></select></label
+              ><label
+                >Prioridade<select x-model="form.priority">
+                  <option>P0</option>
+                  <option>P1</option>
+                  <option>P2</option>
+                  <option>P3</option>
+                </select></label
+              ><label>Responsável<input x-model="form.assignee" /></label
+              ><label>Início planejado<input type="date" x-model="form.plannedStartDate" /></label
+              ><label>Prazo<input type="date" x-model="form.dueDate" /></label
+              ><label
+                >Posição<input type="number" min="0" step="1" x-model.number="form.position"
+              /></label>
+            </div>
+            <footer>
+              <button class="btn btn-secondary" type="button" @click="closeForm">Cancelar</button
+              ><button class="btn btn-primary" type="submit" :disabled="saving">
+                <span class="spinner" x-show="saving"></span
+                ><span x-text="saving ? 'Salvando…' : 'Salvar tarefa'"></span>
+              </button>
+            </footer>
+          </form>
+        </section>
+      </div>
+      <div class="toast" :class="toastType" x-show="toast" x-text="toast" role="status"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

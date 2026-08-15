@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import {
@@ -78,5 +79,12 @@ describe('schema Drizzle de projetos', () => {
     expect(checkNames).toEqual(
       expect.arrayContaining(['projects_progress_range', 'projects_planned_dates_order']),
     );
+  });
+
+  it('migra a constraint para exigir prazo estritamente posterior', async () => {
+    const migration = await readFile('drizzle/0004_clumsy_mauler.sql', 'utf8');
+    expect(migration).toContain('DROP CONSTRAINT "projects_planned_dates_order"');
+    expect(migration).toContain('"planned_start_date" < "projects"."due_date"');
+    expect(migration).not.toContain('"planned_start_date" <= "projects"."due_date"');
   });
 });

@@ -75,8 +75,9 @@ export function registerProjectRoutes(
     }),
   );
 
-  app.post('/api/projects', { preHandler: writeGuards }, async (request, reply) =>
-    respond(reply, async () => {
+  app.post('/api/projects', { preHandler: writeGuards }, async (request, reply) => {
+    if (!requireAdmin(request, reply)) return reply;
+    return respond(reply, async () => {
       const created = await mutate(dependencies, async (service, audit) => {
         const userId = request.authUser!.id;
         const created = await service.create(request.body, userId);
@@ -89,11 +90,12 @@ export function registerProjectRoutes(
         return created;
       });
       return reply.code(201).send(created);
-    }),
-  );
+    });
+  });
 
-  app.patch('/api/projects/:id', { preHandler: writeGuards }, async (request, reply) =>
-    respond(reply, async () => {
+  app.patch('/api/projects/:id', { preHandler: writeGuards }, async (request, reply) => {
+    if (!requireAdmin(request, reply)) return reply;
+    return respond(reply, async () => {
       const parsed = idParamsSchema.safeParse(request.params);
       if (!parsed.success) throw new ProjectServiceError(400, 'Identificador de projeto inválido.');
       return mutate(dependencies, async (service, audit) => {
@@ -107,8 +109,8 @@ export function registerProjectRoutes(
         });
         return updated;
       });
-    }),
-  );
+    });
+  });
 
   app.post('/api/projects/:id/archive', { preHandler: writeGuards }, async (request, reply) =>
     respond(reply, async () => {

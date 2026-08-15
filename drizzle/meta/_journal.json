@@ -29,6 +29,13 @@
       "when": 1786759316670,
       "tag": "0003_big_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786765927397,
+      "tag": "0004_clumsy_mauler",
+      "breakpoints": true
     }
   ]
 }

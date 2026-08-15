@@ -44,11 +44,25 @@ describe('schemas de projetos', () => {
     expect(() => createProjectSchema.parse({ ...validProject, code: 'KBO-999' })).toThrow();
   });
 
-  it('rejeita datas planejadas invertidas', () => {
+  it('rejeita datas planejadas invertidas ou iguais na criação e atualização', () => {
     expect(() =>
       createProjectSchema.parse({
         ...validProject,
         plannedStartDate: '2026-10-01',
+        dueDate: '2026-09-30',
+      }),
+    ).toThrow();
+    expect(() =>
+      createProjectSchema.parse({
+        ...validProject,
+        plannedStartDate: '2026-09-30',
+        dueDate: '2026-09-30',
+      }),
+    ).toThrow();
+    expect(() =>
+      updateProjectSchema.parse({
+        version: 1,
+        plannedStartDate: '2026-09-30',
         dueDate: '2026-09-30',
       }),
     ).toThrow();
@@ -81,6 +95,7 @@ describe('schemas de projetos', () => {
         pageSize: '50',
         status: 'BACKLOG,EM_ANDAMENTO',
         priority: 'ALTA,CRITICA',
+        health: 'VERDE,AMARELO',
         archived: 'include',
         responsible: 'Ana',
       }),
@@ -90,6 +105,7 @@ describe('schemas de projetos', () => {
         pageSize: 50,
         status: ['BACKLOG', 'EM_ANDAMENTO'],
         priority: ['ALTA', 'CRITICA'],
+        health: ['VERDE', 'AMARELO'],
         archived: 'include',
         responsible: 'Ana',
       }),

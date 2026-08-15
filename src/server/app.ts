@@ -233,6 +233,11 @@ export async function buildApp({
         .type('text/html; charset=utf-8')
         .send(await readFile(resolve(webRoot, 'projects.html'))),
     );
+    app.get('/projects/:id', { preHandler: pageSessionGuard }, async (_request, reply) =>
+      reply
+        .type('text/html; charset=utf-8')
+        .send(await readFile(resolve(webRoot, 'project-detail.html'))),
+    );
     app.get('/projects/:id/tasks', { preHandler: pageSessionGuard }, async (_request, reply) =>
       reply.type('text/html; charset=utf-8').send(await readFile(resolve(webRoot, 'tasks.html'))),
     );

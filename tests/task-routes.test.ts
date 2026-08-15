@@ -220,7 +220,7 @@ describe('rotas REST de tarefas', () => {
     expect(audits.map((event) => event.action)).toEqual(['TASK_CREATED']);
   });
 
-  it('atualiza com versionamento e auditoria', async () => {
+  it('atualiza pelo endpoint aninhado com versionamento e auditoria', async () => {
     const { app, audits, writeHeaders } = await createApp();
     await app.inject({
       method: 'POST',
@@ -230,13 +230,31 @@ describe('rotas REST de tarefas', () => {
     });
     const updated = await app.inject({
       method: 'PATCH',
-      url: `/api/tasks/${taskId}`,
+      url: `/api/projects/${projectId}/tasks/${taskId}`,
       headers: writeHeaders,
       payload: { version: 1, status: 'CONCLUIDA' },
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json()).toMatchObject({ status: 'CONCLUIDA', version: 2 });
     expect(audits.map((event) => event.action)).toEqual(['TASK_CREATED', 'TASK_UPDATED']);
+  });
+
+  it('rejeita atualização aninhada quando a tarefa pertence a outro projeto', async () => {
+    const { app, audits, writeHeaders } = await createApp();
+    await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/tasks`,
+      headers: writeHeaders,
+      payload: { title: 'Tarefa API' },
+    });
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${randomUUID()}/tasks/${taskId}`,
+      headers: writeHeaders,
+      payload: { version: 1, status: 'EM_ANDAMENTO' },
+    });
+    expect(updated.statusCode).toBe(404);
+    expect(audits.map((event) => event.action)).toEqual(['TASK_CREATED']);
   });
 
   it('exclui com versionamento e auditoria', async () => {

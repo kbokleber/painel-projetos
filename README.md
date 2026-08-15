@@ -2,7 +2,16 @@
 
 Sistema web interno da KBO Soluções para gestão de projetos, tarefas, releases e visão de portfólio.
 
-> Estado atual: **Fase 3 — CRUD de Tarefas**, com autenticação e projetos das fases anteriores.
+> Estado atual: **Fase 7 — redesign UI/UX**, com autenticação, projetos e tarefas das fases anteriores.
+
+## Escopo entregue na Fase 7
+
+- Design system responsivo KBO, acessível e baseado em Plus Jakarta Sans self-hosted.
+- Login profissional, topbar consistente, dashboard com KPIs calculados a partir dos projetos e estados de loading, vazio e erro.
+- Projetos em cards ou tabela, filtros completos, modal organizado e preservação das regras de administração.
+- Nova página de detalhe em `/projects/:id`, com visão geral, tarefas, releases e notas sem simular backends inexistentes.
+- Tarefas em Lista e Kanban, drag and drop otimista com rollback e alternativa acessível por seletor de status.
+- Suíte Playwright determinística para desktop, smoke mobile em 360 px e capturas de evolução visual.
 
 ## Escopo entregue na Fase 1
 
@@ -23,6 +32,7 @@ Sistema web interno da KBO Soluções para gestão de projetos, tarefas, release
 - Campo único `Cliente/Área`, slug editável, descrição, status, prioridade, datas, equipe, stack, URLs, saúde e notas.
 - Filtros por status, cliente/área, período, responsável e prioridade, com paginação e ordenação.
 - Concorrência otimista pelo campo `version` em atualizações e mudanças de arquivamento.
+- Criação e edição de projetos somente por `ADMIN`; leitura por ambos os perfis.
 - Arquivamento por `OPERATOR` e `ADMIN`; restauração e exclusão física somente por `ADMIN`.
 - Exclusão física somente após arquivamento e quando não houver tarefas vinculadas.
 - Auditoria de criação, atualização, arquivamento, restauração e exclusão.
@@ -194,11 +204,11 @@ Exige sessão e token CSRF, remove a sessão no PostgreSQL, limpa o cookie e reg
 
 Todas as rotas exigem sessão. `POST`, `PATCH` e `DELETE` também exigem o header `x-csrf-token` e o cookie CSRF correspondente.
 
-- `POST /api/projects`: cria projeto; o campo `code` é gerado pelo PostgreSQL e não é aceito no payload.
+- `POST /api/projects`: cria projeto, somente para `ADMIN`; o campo `code` é gerado pelo PostgreSQL e não é aceito no payload.
 - `GET /api/projects`: lista com paginação, ordenação e filtros `status`, `priority`, `clientArea`, `responsible`, `periodFrom` e `periodTo`.
 - `GET /api/projects/:id`: retorna o detalhe de um projeto.
-- `PATCH /api/projects/:id`: atualiza parcialmente; exige `version` no payload.
-- `POST /api/projects/:id/archive`: arquiva; exige `{ "version": n }`.
+- `PATCH /api/projects/:id`: atualiza parcialmente, somente para `ADMIN`; exige `version` no payload.
+- `POST /api/projects/:id/archive`: arquiva por `ADMIN` ou `OPERATOR`; exige `{ "version": n }`.
 - `POST /api/projects/:id/restore`: restaura; exige `ADMIN` e `{ "version": n }`.
 - `DELETE /api/projects/:id`: exclui projeto arquivado; exige `ADMIN` e `{ "version": n }`.
 - `GET /api/projects/stats`: retorna totais simples por status, prioridade e saúde.
@@ -213,6 +223,7 @@ Todas as rotas exigem sessão. `POST`, `PATCH` e `DELETE` também exigem CSRF.
 - `GET /api/projects/:projectId/tasks`: lista tarefas com filtros `search`, `status`, `priority`, `assignee`, `dueFrom` e `dueTo`.
 - `GET /api/tasks/:id`: retorna uma tarefa.
 - `PATCH /api/tasks/:id`: atualiza parcialmente; exige `version`.
+- `PATCH /api/projects/:projectId/tasks/:taskId`: rota preferencial para atualizações; exige `version` e valida o vínculo entre projeto e tarefa.
 - `DELETE /api/tasks/:id`: exclui; exige `{ "version": n }`.
 
 Payload mínimo de criação:
@@ -224,6 +235,8 @@ Payload mínimo de criação:
 ```
 
 Campos opcionais: `description`, `status`, `priority`, `assignee`, `plannedStartDate`, `dueDate` e `position`. Os defaults são `PENDENTE`, `P2` e posição `0`. Campos desconhecidos, `id`, `projectId`, `completedAt` e `version` são rejeitados na criação.
+
+A rota plana `PATCH /api/tasks/:id` permanece disponível por compatibilidade. A interface da Fase 7 usa a rota aninhada para edições, conclusão e movimentação no Kanban. Em conflito de versão (`409`), recarrega a listagem antes de permitir uma nova alteração.
 
 ## Banco de dados — Fase 3
 

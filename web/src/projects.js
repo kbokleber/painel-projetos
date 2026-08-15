@@ -1,68 +1,55 @@
-function emptyForm() {
-  return {
-    id: '',
-    version: 0,
-    name: '',
-    slug: '',
-    description: '',
-    clientArea: '',
-    status: 'BACKLOG',
-    priority: 'MEDIA',
-    plannedStartDate: '',
-    dueDate: '',
-    actualEndDate: '',
-    responsibleTeamText: '',
-    technologyStackText: '',
-    repositoryUrl: '',
-    productionUrl: '',
-    health: 'VERDE',
-    healthReason: '',
-    notes: '',
-  };
-}
-
-function optional(value) {
-  const normalized = typeof value === 'string' ? value.trim() : value;
-  return normalized || null;
-}
-
-function splitList(value) {
-  const seen = new Set();
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => {
-      const key = item.toLocaleLowerCase('pt-BR');
-      if (!item || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-}
-
-function errorMessage(data, fallback) {
-  if (typeof data?.error === 'string') return data.error;
-  if (typeof data?.error?.message === 'string') return data.error.message;
-  return fallback;
-}
-
-export function registerProjectsPage(Alpine, requestCsrfToken) {
+import { csrf, apiError } from './main.js';
+const blank = () => ({
+  id: '',
+  version: 0,
+  name: '',
+  slug: '',
+  description: '',
+  clientArea: '',
+  status: 'BACKLOG',
+  priority: 'MEDIA',
+  plannedStartDate: '',
+  dueDate: '',
+  actualEndDate: '',
+  responsibleTeamText: '',
+  technologyStackText: '',
+  repositoryUrl: '',
+  productionUrl: '',
+  health: 'VERDE',
+  healthReason: '',
+  notes: '',
+});
+const nullable = (v) => String(v || '').trim() || null;
+const list = (v) => [
+  ...new Set(
+    String(v || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean),
+  ),
+];
+export function registerProjectsPage(Alpine, shared) {
   Alpine.data('projectsPage', () => ({
+    ...shared(),
     user: null,
     csrfToken: '',
     projects: [],
     loading: true,
     saving: false,
     error: '',
-    success: '',
+    formError: '',
     formOpen: false,
-    form: emptyForm(),
-    stats: { total: 0, inProgress: 0, critical: 0, redHealth: 0 },
+    lastFocusedElement: null,
+    menuId: '',
+    view: 'cards',
+    form: blank(),
     filters: {
       search: '',
       status: '',
       clientArea: '',
       responsible: '',
       priority: '',
+      health: '',
       periodFrom: '',
       periodTo: '',
       archived: 'exclude',
@@ -70,21 +57,8 @@ export function registerProjectsPage(Alpine, requestCsrfToken) {
     page: 1,
     pageSize: 20,
     total: 0,
-
-    get userLabel() {
-      return this.user ? `${this.user.username} · ${this.user.role}` : '';
-    },
     get isAdmin() {
       return this.user?.role === 'ADMIN';
-    },
-    get showEmpty() {
-      return !this.loading && this.projects.length === 0;
-    },
-    get showTable() {
-      return !this.loading && this.projects.length > 0;
-    },
-    get showPagination() {
-      return this.total > this.pageSize;
     },
     get isFirstPage() {
       return this.page <= 1;
@@ -92,303 +66,246 @@ export function registerProjectsPage(Alpine, requestCsrfToken) {
     get isLastPage() {
       return this.page * this.pageSize >= this.total;
     },
-    get paginationLabel() {
-      if (!this.total) return '0 projetos';
-      const start = (this.page - 1) * this.pageSize + 1;
-      const end = Math.min(this.page * this.pageSize, this.total);
-      return `${start}–${end} de ${this.total}`;
+    get hasProjects() {
+      return !this.loading && this.projects.length > 0;
     },
-    get formTitle() {
-      return this.form.id ? `Editar ${this.form.name}` : 'Novo projeto';
-    },
-
     async init() {
       try {
-        const [meResponse, csrfToken] = await Promise.all([
-          fetch('/auth/me', { credentials: 'same-origin' }),
-          requestCsrfToken(),
-        ]);
-        if (meResponse.status === 401) {
-          window.location.assign('/login');
+        const [me, token] = await Promise.all([fetch('/auth/me'), csrf()]);
+        if (me.status === 401) {
+          location.assign('/login');
           return;
         }
-        if (!meResponse.ok) throw new Error('Não foi possível carregar o usuário.');
-        this.user = (await meResponse.json()).user;
-        this.csrfToken = csrfToken;
-        this.readFiltersFromUrl();
-        await Promise.all([this.loadProjects(), this.loadStats()]);
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Não foi possível carregar projetos.';
+        this.user = (await me.json()).user;
+        this.csrfToken = token;
+        const edit = new URLSearchParams(location.search).get('edit');
+        this.readUrl();
+        await this.load();
+        if (edit && this.isAdmin) await this.openEditById(edit);
+      } catch (e) {
+        this.error = e.message || 'Não foi possível carregar projetos.';
         this.loading = false;
       }
     },
-
-    readFiltersFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      for (const key of Object.keys(this.filters)) {
-        if (params.has(key)) this.filters[key] = params.get(key) || '';
-      }
-      const page = Number(params.get('page'));
-      if (Number.isInteger(page) && page > 0) this.page = page;
+    readUrl() {
+      const p = new URLSearchParams(location.search);
+      Object.keys(this.filters).forEach((k) => {
+        if (p.has(k)) this.filters[k] = p.get(k) || '';
+      });
     },
-
-    queryString() {
-      const params = new URLSearchParams();
-      params.set('page', String(this.page));
-      params.set('pageSize', String(this.pageSize));
-      for (const [key, value] of Object.entries(this.filters)) {
-        if (value && !(key === 'archived' && value === 'exclude')) params.set(key, value);
-      }
-      return params;
+    query() {
+      const p = new URLSearchParams({ page: String(this.page), pageSize: String(this.pageSize) });
+      Object.entries(this.filters).forEach(([k, v]) => {
+        if (v && !(k === 'archived' && v === 'exclude')) p.set(k, v);
+      });
+      return p;
     },
-
-    async loadProjects() {
+    async load() {
       this.loading = true;
       this.error = '';
-      const params = this.queryString();
-      window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
       try {
-        const response = await fetch(`/api/projects?${params.toString()}`, {
-          credentials: 'same-origin',
-        });
-        if (response.status === 401) {
-          window.location.assign('/login');
-          return;
-        }
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(errorMessage(data, 'Não foi possível listar projetos.'));
-        this.projects = data.items || data.projects || [];
-        this.total = data.total || 0;
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Não foi possível listar projetos.';
+        const p = this.query();
+        history.replaceState(null, '', `${location.pathname}?${p}`);
+        const r = await fetch(`/api/projects?${p}`);
+        if (!r.ok) await apiError(r, 'Não foi possível listar projetos.');
+        const d = await r.json();
+        this.projects = d.items || d.projects || [];
+        this.total = d.total || 0;
+      } catch (e) {
+        this.error = e.message;
       } finally {
         this.loading = false;
       }
     },
-
-    async loadStats() {
-      try {
-        const response = await fetch('/api/projects/stats', { credentials: 'same-origin' });
-        if (!response.ok) return;
-        const data = await response.json();
-        this.stats = {
-          total: data.total || 0,
-          inProgress: data.inProgress || data.byStatus?.EM_ANDAMENTO || 0,
-          critical: data.critical || data.byPriority?.CRITICA || 0,
-          redHealth: data.redHealth || data.byHealth?.VERMELHO || 0,
-        };
-      } catch {
-        // Estatísticas são complementares; a listagem permanece utilizável.
-      }
-    },
-
-    async applyFilters() {
+    applyFilters() {
       this.page = 1;
-      await this.loadProjects();
+      return this.load();
     },
-
-    async clearFilters() {
+    clearFilters() {
       this.filters = {
         search: '',
         status: '',
         clientArea: '',
         responsible: '',
         priority: '',
+        health: '',
         periodFrom: '',
         periodTo: '',
         archived: 'exclude',
       };
       this.page = 1;
-      await this.loadProjects();
+      return this.load();
     },
-
-    async previousPage() {
-      if (this.isFirstPage) return;
-      this.page -= 1;
-      await this.loadProjects();
+    setCards() {
+      this.view = 'cards';
     },
-
-    async nextPage() {
-      if (this.isLastPage) return;
-      this.page += 1;
-      await this.loadProjects();
+    setTable() {
+      this.view = 'table';
     },
-
-    openCreate() {
-      this.error = '';
-      this.success = '';
-      this.form = emptyForm();
-      this.formOpen = true;
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    toggleMenu(e) {
+      const id = e.currentTarget.dataset.id;
+      this.menuId = this.menuId === id ? '' : id;
     },
-
-    async openEdit(event) {
-      const id = event.currentTarget.dataset.id;
-      this.error = '';
-      try {
-        const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
-          credentials: 'same-origin',
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok)
-          throw new Error(errorMessage(data, 'Não foi possível carregar o projeto.'));
-        const project = data.project || data;
-        this.form = {
-          ...emptyForm(),
-          ...project,
-          description: project.description || '',
-          clientArea: project.clientArea || '',
-          plannedStartDate: project.plannedStartDate || '',
-          dueDate: project.dueDate || '',
-          actualEndDate: project.actualEndDate || '',
-          responsibleTeamText: (project.responsibleTeam || []).join(', '),
-          technologyStackText: (project.technologyStack || []).join(', '),
-          repositoryUrl: project.repositoryUrl || '',
-          productionUrl: project.productionUrl || '',
-          healthReason: project.healthReason || '',
-          notes: project.notes || '',
-        };
-        this.formOpen = true;
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      } catch (error) {
-        this.error =
-          error instanceof Error ? error.message : 'Não foi possível carregar o projeto.';
+    nextPage() {
+      if (!this.isLastPage) {
+        this.page++;
+        return this.load();
       }
     },
-
+    previousPage() {
+      if (!this.isFirstPage) {
+        this.page--;
+        return this.load();
+      }
+    },
+    focusForm() {
+      setTimeout(() => document.querySelector('[data-project-name]')?.focus(), 0);
+    },
+    openCreate() {
+      if (!this.isAdmin) return;
+      this.lastFocusedElement = document.activeElement;
+      this.form = blank();
+      this.formError = '';
+      this.formOpen = true;
+      this.focusForm();
+    },
+    async openEdit(e) {
+      if (!this.isAdmin) return;
+      this.lastFocusedElement = document.activeElement;
+      await this.openEditById(e.currentTarget.dataset.id);
+    },
+    async openEditById(id) {
+      if (!this.isAdmin) return;
+      try {
+        const r = await fetch(`/api/projects/${encodeURIComponent(id)}`);
+        if (!r.ok) await apiError(r, 'Não foi possível carregar o projeto.');
+        const p = await r.json();
+        this.form = {
+          ...blank(),
+          ...p,
+          responsibleTeamText: (p.responsibleTeam || []).join(', '),
+          technologyStackText: (p.technologyStack || []).join(', '),
+        };
+        this.formOpen = true;
+        this.menuId = '';
+        this.focusForm();
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
     closeForm() {
       this.formOpen = false;
-      this.form = emptyForm();
+      this.form = blank();
+      const previous = this.lastFocusedElement;
+      this.lastFocusedElement = null;
+      setTimeout(() => previous?.focus(), 0);
     },
-
-    projectPayload() {
+    handleModalKeydown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.closeForm();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [
+        ...event.currentTarget.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((element) => element.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    payload() {
       return {
-        name: this.form.name,
-        slug: this.form.slug,
-        description: optional(this.form.description),
-        clientArea: this.form.clientArea,
+        name: this.form.name.trim(),
+        slug: this.form.slug.trim(),
+        description: nullable(this.form.description),
+        clientArea: this.form.clientArea.trim(),
         status: this.form.status,
         priority: this.form.priority,
-        plannedStartDate: optional(this.form.plannedStartDate),
-        dueDate: optional(this.form.dueDate),
-        actualEndDate: optional(this.form.actualEndDate),
-        responsibleTeam: splitList(this.form.responsibleTeamText),
-        technologyStack: splitList(this.form.technologyStackText),
-        repositoryUrl: optional(this.form.repositoryUrl),
-        productionUrl: optional(this.form.productionUrl),
+        plannedStartDate: nullable(this.form.plannedStartDate),
+        dueDate: nullable(this.form.dueDate),
+        actualEndDate: nullable(this.form.actualEndDate),
+        responsibleTeam: list(this.form.responsibleTeamText),
+        technologyStack: list(this.form.technologyStackText),
+        repositoryUrl: nullable(this.form.repositoryUrl),
+        productionUrl: nullable(this.form.productionUrl),
         health: this.form.health,
-        healthReason: optional(this.form.healthReason),
-        notes: optional(this.form.notes),
+        healthReason: nullable(this.form.healthReason),
+        notes: nullable(this.form.notes),
       };
     },
-
     async saveProject() {
+      this.formError = '';
+      if (!this.form.name.trim() || !this.form.slug.trim() || !this.form.clientArea.trim()) {
+        this.formError = 'Preencha nome, slug e cliente/área.';
+        return;
+      }
       this.saving = true;
-      this.error = '';
-      this.success = '';
-      const editing = Boolean(this.form.id);
-      const payload = this.projectPayload();
-      if (editing) payload.version = this.form.version;
       try {
-        const response = await fetch(editing ? `/api/projects/${this.form.id}` : '/api/projects', {
-          method: editing ? 'PATCH' : 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': this.csrfToken,
-          },
-          body: JSON.stringify(payload),
+        const edit = Boolean(this.form.id),
+          body = this.payload();
+        if (edit) body.version = this.form.version;
+        const r = await fetch(edit ? `/api/projects/${this.form.id}` : '/api/projects', {
+          method: edit ? 'PATCH' : 'POST',
+          headers: { 'content-type': 'application/json', 'x-csrf-token': this.csrfToken },
+          body: JSON.stringify(body),
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(errorMessage(data, 'Não foi possível salvar o projeto.'));
-        this.success = editing ? 'Projeto atualizado.' : 'Projeto criado.';
+        if (!r.ok) await apiError(r, 'Não foi possível salvar o projeto.');
         this.closeForm();
-        await Promise.all([this.loadProjects(), this.loadStats()]);
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Não foi possível salvar o projeto.';
+        this.showToast(edit ? 'Projeto atualizado.' : 'Projeto criado.');
+        await this.load();
+      } catch (e) {
+        this.formError = e.message;
       } finally {
         this.saving = false;
       }
     },
-
-    async mutateProject(id, action, version, successMessage) {
-      this.error = '';
-      this.success = '';
+    async archiveProject(e) {
+      const p = this.projects.find((x) => x.id === e.currentTarget.dataset.id);
+      if (!p || !confirm('Arquivar este projeto?')) return;
+      await this.projectAction(p, 'archive', 'Projeto arquivado.');
+    },
+    async restoreProject(e) {
+      const p = this.projects.find((x) => x.id === e.currentTarget.dataset.id);
+      if (p && this.isAdmin) await this.projectAction(p, 'restore', 'Projeto restaurado.');
+    },
+    async projectAction(p, action, msg) {
       try {
-        const response = await fetch(`/api/projects/${encodeURIComponent(id)}/${action}`, {
+        const r = await fetch(`/api/projects/${p.id}/${action}`, {
           method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': this.csrfToken,
-          },
-          body: JSON.stringify({ version }),
+          headers: { 'content-type': 'application/json', 'x-csrf-token': this.csrfToken },
+          body: JSON.stringify({ version: p.version }),
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok)
-          throw new Error(errorMessage(data, 'Não foi possível alterar o projeto.'));
-        this.success = successMessage;
-        await Promise.all([this.loadProjects(), this.loadStats()]);
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Não foi possível alterar o projeto.';
+        if (!r.ok) await apiError(r, 'Não foi possível alterar o projeto.');
+        this.showToast(msg);
+        await this.load();
+      } catch (e) {
+        this.error = e.message;
       }
     },
-
-    async archiveProject(event) {
-      const id = event.currentTarget.dataset.id;
-      const project = this.projects.find((item) => item.id === id);
-      if (!project || !window.confirm('Arquivar este projeto?')) return;
-      await this.mutateProject(id, 'archive', project.version, 'Projeto arquivado.');
-    },
-
-    async restoreProject(event) {
-      const id = event.currentTarget.dataset.id;
-      const project = this.projects.find((item) => item.id === id);
-      if (!project || !window.confirm('Restaurar este projeto?')) return;
-      await this.mutateProject(id, 'restore', project.version, 'Projeto restaurado.');
-    },
-
-    async deleteProject(event) {
-      const id = event.currentTarget.dataset.id;
-      const project = this.projects.find((item) => item.id === id);
-      if (!project || !this.isAdmin) return;
-      if (
-        !window.confirm('Excluir definitivamente este projeto? Esta ação não pode ser desfeita.')
-      ) {
-        return;
-      }
-      this.error = '';
-      this.success = '';
+    async deleteProject(e) {
+      const p = this.projects.find((x) => x.id === e.currentTarget.dataset.id);
+      if (!p || !this.isAdmin || !confirm('Excluir definitivamente este projeto?')) return;
       try {
-        const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
+        const r = await fetch(`/api/projects/${p.id}`, {
           method: 'DELETE',
-          credentials: 'same-origin',
-          headers: {
-            'content-type': 'application/json',
-            'x-csrf-token': this.csrfToken,
-          },
-          body: JSON.stringify({ version: project.version }),
+          headers: { 'content-type': 'application/json', 'x-csrf-token': this.csrfToken },
+          body: JSON.stringify({ version: p.version }),
         });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(errorMessage(data, 'Não foi possível excluir o projeto.'));
-        }
-        this.success = 'Projeto excluído definitivamente.';
-        await Promise.all([this.loadProjects(), this.loadStats()]);
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Não foi possível excluir o projeto.';
-      }
-    },
-
-    async logout() {
-      try {
-        await fetch('/auth/logout', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'x-csrf-token': this.csrfToken },
-        });
-      } finally {
-        window.location.assign('/login');
+        if (!r.ok) await apiError(r, 'Não foi possível excluir.');
+        this.showToast('Projeto excluído.');
+        await this.load();
+      } catch (err) {
+        this.error = err.message;
       }
     },
   }));

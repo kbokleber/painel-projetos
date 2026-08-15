@@ -164,7 +164,7 @@ export const projects = pgTable(
     check('projects_progress_range', sql`${table.progressPercent} between 0 and 100`),
     check(
       'projects_planned_dates_order',
-      sql`${table.plannedStartDate} is null or ${table.dueDate} is null or ${table.plannedStartDate} <= ${table.dueDate}`,
+      sql`${table.plannedStartDate} is null or ${table.dueDate} is null or ${table.plannedStartDate} < ${table.dueDate}`,
     ),
   ],
 );

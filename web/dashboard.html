@@ -2,29 +2,151 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard | Painel de Projetos KBO</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Visão geral dos projetos KBO" />
+    <title>Dashboard | KBO</title>
   </head>
   <body>
-    <div class="dashboard-shell" x-data="dashboardPage">
-      <header class="dashboard-header">
-        <div>
-          <strong>Painel de Projetos KBO</strong>
-          <small x-cloak x-show="user"
-            ><span x-text="usernameLabel"></span> · <span x-text="roleLabel"></span
-          ></small>
+    <div class="app-shell" x-data="dashboardPage" x-init="init">
+      <header class="topbar">
+        <a class="logo logo-light" href="/dashboard" aria-label="KBO Soluções">
+          <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="180" height="48" />
+        </a>
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href="/dashboard">Início</a><span>/</span><strong>Dashboard</strong>
+        </nav>
+        <form class="global-search" @submit.prevent="runGlobalSearch">
+          <span aria-hidden="true">⌕</span
+          ><input
+            type="search"
+            placeholder="Buscar projetos, tarefas..."
+            aria-label="Busca global"
+            x-model="globalSearch"
+          />
+        </form>
+        <div class="profile">
+          <button
+            class="profile-trigger"
+            type="button"
+            @click="toggleProfile"
+            aria-label="Abrir menu do perfil"
+          >
+            <span class="avatar" x-text="initials(user && user.username)"></span
+            ><span class="profile-copy"
+              ><strong x-text="user && user.username"></strong
+              ><small x-text="user && user.role"></small></span
+            ><span>⌄</span>
+          </button>
+          <div class="profile-menu" x-cloak x-show="profileOpen">
+            <button type="button" @click="signOut">Sair da conta</button>
+          </div>
         </div>
-        <button class="secondary-button" type="button" @click="logout">Sair</button>
       </header>
-      <main class="dashboard-main">
-        <p class="error-message" role="alert" x-cloak x-show="error" x-text="error"></p>
-        <section class="placeholder-card">
-          <span class="brand-mark">Fase 2</span>
-          <h1>Gestão de projetos</h1>
-          <p>Cadastre projetos, acompanhe status, prioridade, saúde, equipe, stack e prazos.</p>
-          <a class="primary-link" href="/projects">Abrir projetos</a>
+      <main class="page">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">VISÃO GERAL</p>
+            <h1>
+              <span x-text="greeting"></span>,
+              <span class="text-gradient" x-text="firstName"></span>!
+            </h1>
+            <p>Acompanhe o ritmo dos projetos e o que precisa de atenção hoje.</p>
+          </div>
+          <a class="btn btn-primary" href="/projects">Ver todos os projetos <span>→</span></a>
+        </section>
+        <div class="error-state compact" x-cloak x-show="error">
+          <strong>Algo deu errado</strong><span x-text="error"></span
+          ><button class="btn btn-secondary" @click="load">Tentar novamente</button>
+        </div>
+        <section class="kpi-grid" aria-label="Indicadores">
+          <template x-for="i in 4"
+            ><div class="skeleton kpi-skeleton" x-show="loading"></div
+          ></template>
+          <article class="kpi-card" x-cloak x-show="!loading">
+            <span class="kpi-icon blue">▦</span>
+            <div>
+              <small>Total de projetos</small><strong x-text="stats.total"></strong
+              ><span>Portfólio ativo</span>
+            </div>
+          </article>
+          <article class="kpi-card" x-cloak x-show="!loading">
+            <span class="kpi-icon orange">↗</span>
+            <div>
+              <small>Em andamento</small><strong x-text="stats.inProgress"></strong
+              ><span>Em execução</span>
+            </div>
+          </article>
+          <article class="kpi-card" x-cloak x-show="!loading">
+            <span class="kpi-icon red">!</span>
+            <div>
+              <small>Atrasados</small><strong x-text="stats.overdue"></strong
+              ><span>Precisam de atenção</span>
+            </div>
+          </article>
+          <article class="kpi-card" x-cloak x-show="!loading">
+            <span class="kpi-icon green">✓</span>
+            <div>
+              <small>Concluídos</small><strong x-text="stats.completed"></strong
+              ><span>Entregas realizadas</span>
+            </div>
+          </article>
+        </section>
+        <section class="section-block">
+          <div class="section-head">
+            <div>
+              <h2>Projetos ativos</h2>
+              <p>Iniciativas recentes e seu progresso.</p>
+            </div>
+            <a href="/projects">Ver todos →</a>
+          </div>
+          <div class="project-grid">
+            <template x-for="p in projects.slice(0, 6)" :key="p.id"
+              ><a class="project-card" :href="'/projects/'+p.id"
+                ><div class="card-top">
+                  <span class="code" x-text="p.code"></span
+                  ><span
+                    class="pill"
+                    :class="p.status.toLowerCase()"
+                    x-text="label(p.status)"
+                  ></span>
+                </div>
+                <h3 x-text="p.name"></h3>
+                <p x-text="p.description || p.clientArea"></p>
+                <div class="progress-label">
+                  <span>Progresso</span><strong x-text="p.progressPercent+'%'"></strong>
+                </div>
+                <div class="progress"><span :style="'width:'+p.progressPercent+'%'"></span></div>
+                <footer>
+                  <div class="avatar-stack">
+                    <template x-for="member in p.responsibleTeam.slice(0,3)"
+                      ><span class="avatar small" x-text="initials(member)"></span
+                    ></template>
+                  </div>
+                  <span class="due"
+                    ><i :class="p.health.toLowerCase()"></i><span x-text="date(p.dueDate)"></span
+                  ></span></footer></a
+            ></template>
+          </div>
+          <div class="empty-state" x-cloak x-show="!loading && !error && projects.length === 0">
+            <div class="empty-art">◇</div>
+            <h3>Nenhum projeto ativo</h3>
+            <p
+              x-text="user && user.role === 'ADMIN' ? 'Crie o primeiro projeto para começar a acompanhar as entregas.' : 'Nenhum projeto ativo está disponível no momento.'"
+            ></p>
+            <a class="btn btn-primary" href="/projects" x-show="user && user.role === 'ADMIN'"
+              >Criar projeto</a
+            >
+          </div>
         </section>
       </main>
+      <div
+        class="toast"
+        :class="toastType"
+        x-cloak
+        x-show="toast"
+        role="status"
+        x-text="toast"
+      ></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

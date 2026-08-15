@@ -44,8 +44,8 @@ function makeProject(overrides: Partial<Project> = {}): Project {
   };
 }
 
-function projectRepositoryFixture() {
-  let stored: Project | null = null;
+function projectRepositoryFixture(initialProject: Project | null = null) {
+  let stored: Project | null = initialProject;
   const repository: ProjectRepository = {
     create: async (input, actorId) => {
       stored = makeProject({ ...input, createdByUserId: actorId, updatedByUserId: actorId });
@@ -85,10 +85,13 @@ function projectRepositoryFixture() {
   return repository;
 }
 
-async function createApp(role: AuthenticatedUser['role'] = 'OPERATOR') {
+async function createApp(
+  role: AuthenticatedUser['role'] = 'OPERATOR',
+  initialProject: Project | null = null,
+) {
   const audits: AuditEventInput[] = [];
   const user: AuthenticatedUser = { id: userId, username: 'operador', role };
-  const repository = projectRepositoryFixture();
+  const repository = projectRepositoryFixture(initialProject);
   const audit = { record: async (event: AuditEventInput) => void audits.push(event) };
   const dependencies: AppDependencies = {
     users: { findByUsername: async () => null },
@@ -159,16 +162,15 @@ describe('rotas REST de projetos', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('permite ao OPERATOR criar, listar, consultar, atualizar e arquivar com auditoria', async () => {
-    const { app, audits, readHeaders, writeHeaders } = await createApp();
+  it('restringe criação e edição ao ADMIN, mas permite arquivamento ao OPERATOR', async () => {
+    const { app, audits, readHeaders, writeHeaders } = await createApp('OPERATOR', makeProject());
     const created = await app.inject({
       method: 'POST',
       url: '/api/projects',
       headers: writeHeaders,
       payload: createPayload,
     });
-    expect(created.statusCode).toBe(201);
-    expect(created.json<Project>()).toMatchObject({ code: 'KBO-001', progressPercent: 0 });
+    expect(created.statusCode).toBe(403);
 
     const listed = await app.inject({
       method: 'GET',
@@ -190,29 +192,19 @@ describe('rotas REST de projetos', () => {
       headers: writeHeaders,
       payload: { version: 1, name: 'Projeto atualizado' },
     });
-    expect(updated.statusCode).toBe(200);
+    expect(updated.statusCode).toBe(403);
     const archived = await app.inject({
       method: 'POST',
       url: `/api/projects/${projectId}/archive`,
       headers: writeHeaders,
-      payload: { version: 2 },
+      payload: { version: 1 },
     });
     expect(archived.statusCode).toBe(200);
-    expect(audits.map((event) => event.action)).toEqual([
-      'PROJECT_CREATED',
-      'PROJECT_UPDATED',
-      'PROJECT_ARCHIVED',
-    ]);
+    expect(audits.map((event) => event.action)).toEqual(['PROJECT_ARCHIVED']);
   });
 
   it('bloqueia restauração e exclusão para OPERATOR', async () => {
-    const { app, writeHeaders } = await createApp();
-    await app.inject({
-      method: 'POST',
-      url: '/api/projects',
-      headers: writeHeaders,
-      payload: createPayload,
-    });
+    const { app, writeHeaders } = await createApp('OPERATOR', makeProject());
     await app.inject({
       method: 'POST',
       url: `/api/projects/${projectId}/archive`,

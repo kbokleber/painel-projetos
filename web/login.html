@@ -2,61 +2,78 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Acesso ao Painel de Gestão de Projetos da KBO Soluções" />
-    <title>Entrar | Painel de Projetos KBO</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Acesso ao Painel KBO" />
+    <title>Entrar | KBO</title>
   </head>
-  <body>
-    <main class="auth-shell" x-data="loginPage">
-      <section class="auth-card" aria-labelledby="login-title">
-        <header class="brand">
-          <span class="brand-mark">KBO Soluções</span>
-          <h1 id="login-title">Painel de Projetos</h1>
-          <p class="subtitle">Entre com suas credenciais para continuar.</p>
-        </header>
-
-        <form @submit.prevent="submit" novalidate>
-          <div class="form-field">
-            <label for="username">Usuário</label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              autocomplete="username"
-              maxlength="80"
-              required
-              x-model.trim="username"
-            />
-          </div>
-          <div class="form-field">
-            <label for="password">Senha</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              maxlength="512"
-              required
-              x-model="password"
-            />
-          </div>
-          <p
-            class="error-message"
-            role="alert"
-            aria-live="polite"
-            x-cloak
-            x-show="error"
-            x-text="error"
-          ></p>
-          <button
-            class="primary-button"
-            type="submit"
-            :disabled="submitting || !username || !password"
-          >
-            <span x-show="!submitting">Entrar</span>
-            <span x-cloak x-show="submitting">Entrando…</span>
-          </button>
-        </form>
+  <body class="login-page">
+    <main class="login-shell" x-data="loginPage" x-init="init">
+      <section class="login-brand-panel" aria-label="KBO Soluções">
+        <a class="logo logo-light" href="/login" aria-label="KBO Soluções">
+          <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="180" height="48" />
+        </a>
+        <div class="brand-message">
+          <span class="eyebrow light">GESTÃO QUE MOVE RESULTADOS</span>
+          <h2>Projetos claros.<br />Times em sintonia.</h2>
+          <p>Uma visão simples e poderosa para transformar estratégia em entregas.</p>
+        </div>
+        <div class="brand-orbit" aria-hidden="true"></div>
+      </section>
+      <section class="login-form-panel">
+        <div class="login-card">
+          <a class="logo mobile-logo" href="/login" aria-label="KBO Soluções">
+            <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="140" height="36" />
+          </a>
+          <header>
+            <span class="eyebrow">PAINEL DE PROJETOS</span>
+            <h1>Bem-vindo de volta</h1>
+            <p>Entre com suas credenciais para continuar.</p>
+          </header>
+          <form @submit.prevent="submit" novalidate>
+            <div class="floating-field">
+              <input
+                id="username"
+                name="username"
+                type="text"
+                placeholder=" "
+                autocomplete="username"
+                maxlength="80"
+                required
+                x-model.trim="username"
+              /><label for="username">Usuário</label>
+            </div>
+            <div class="floating-field">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder=" "
+                autocomplete="current-password"
+                maxlength="512"
+                required
+                x-model="password"
+              /><label for="password">Senha</label>
+            </div>
+            <div class="login-help">
+              <label class="check-label"
+                ><input type="checkbox" /> <span>Lembrar de mim</span></label
+              ><button type="button" class="link-button" disabled title="Disponível em breve">
+                Esqueci minha senha
+              </button>
+            </div>
+            <p class="inline-alert" role="alert" x-cloak x-show="error" x-text="error"></p>
+            <button
+              class="btn btn-primary btn-block"
+              type="submit"
+              :disabled="submitting || !username || !password"
+            >
+              <span class="spinner" x-cloak x-show="submitting"></span
+              ><span x-show="!submitting">Entrar</span
+              ><span x-cloak x-show="submitting">Entrando…</span>
+            </button>
+          </form>
+        </div>
+        <footer>© 2026 KBO Soluções. Todos os direitos reservados.</footer>
       </section>
     </main>
     <script type="module" src="/src/main.js"></script>

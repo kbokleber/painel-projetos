@@ -7,6 +7,7 @@ import { TaskService, TaskServiceError } from './task-service.js';
 
 const idParamsSchema = z.strictObject({ id: z.uuid() });
 const projectParamsSchema = z.strictObject({ projectId: z.uuid() });
+const projectTaskParamsSchema = z.strictObject({ projectId: z.uuid(), taskId: z.uuid() });
 const versionSchema = z.strictObject({ version: z.number().int().positive() });
 
 function auditContext(request: FastifyRequest) {
@@ -89,6 +90,31 @@ export function registerTaskRoutes(
       });
       return reply.code(201).send(created);
     }),
+  );
+
+  app.patch(
+    '/api/projects/:projectId/tasks/:taskId',
+    { preHandler: writeGuards },
+    async (request, reply) =>
+      respond(reply, async () => {
+        const parsed = projectTaskParamsSchema.safeParse(request.params);
+        if (!parsed.success) throw new TaskServiceError(400, 'Identificadores inválidos.');
+        return mutate(dependencies, async (service, audit) => {
+          const current = await service.get(parsed.data.taskId);
+          if (current.projectId !== parsed.data.projectId) {
+            throw new TaskServiceError(404, 'Tarefa não encontrada neste projeto.');
+          }
+          const userId = request.authUser!.id;
+          const task = await service.update(parsed.data.taskId, request.body, userId);
+          await audit.record({
+            action: 'TASK_UPDATED',
+            userId,
+            metadata: { taskId: task.id, projectId: task.projectId, version: task.version },
+            ...auditContext(request),
+          });
+          return task;
+        });
+      }),
   );
 
   app.patch('/api/tasks/:id', { preHandler: writeGuards }, async (request, reply) =>

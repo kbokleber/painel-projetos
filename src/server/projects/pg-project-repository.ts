@@ -54,6 +54,7 @@ function conditionsFor(query: ListProjectsQuery): SQL[] {
   }
   if (query.status?.length) conditions.push(inArray(projects.status, query.status));
   if (query.priority?.length) conditions.push(inArray(projects.priority, query.priority));
+  if (query.health?.length) conditions.push(inArray(projects.health, query.health));
 
   if (query.clientArea) conditions.push(ilike(projects.clientArea, `%${query.clientArea}%`));
   if (query.responsible) {

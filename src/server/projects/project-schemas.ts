@@ -78,11 +78,11 @@ function validateDateOrder(
   },
   context: z.RefinementCtx,
 ) {
-  if (value.plannedStartDate && value.dueDate && value.plannedStartDate > value.dueDate) {
+  if (value.plannedStartDate && value.dueDate && value.plannedStartDate >= value.dueDate) {
     context.addIssue({
       code: 'custom',
       path: ['dueDate'],
-      message: 'O prazo não pode ser anterior à data de início.',
+      message: 'O prazo deve ser posterior à data de início.',
     });
   }
 }
@@ -146,6 +146,7 @@ export const listProjectsQuerySchema = z
     search: z.string().trim().max(160).optional(),
     status: csvEnum(PROJECT_STATUSES).optional(),
     priority: csvEnum(PROJECT_PRIORITIES).optional(),
+    health: csvEnum(PROJECT_HEALTH_VALUES).optional(),
     clientArea: z.string().trim().max(160).optional(),
     responsible: z.string().trim().max(120).optional(),
     periodFrom: isoDateSchema.optional(),

@@ -18,6 +18,10 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
+    files: ['e2e/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ['vite.config.ts', 'vitest.config.ts', 'drizzle.config.ts', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },

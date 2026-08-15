@@ -1,0 +1,2 @@
+ALTER TABLE "projects" DROP CONSTRAINT "projects_planned_dates_order";--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_planned_dates_order" CHECK ("projects"."planned_start_date" is null or "projects"."due_date" is null or "projects"."planned_start_date" < "projects"."due_date");

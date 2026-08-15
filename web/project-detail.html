@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Detalhe do projeto KBO" />
+    <title>Detalhe do projeto | KBO</title>
+  </head>
+  <body>
+    <div class="app-shell" x-data="projectDetail" x-init="init">
+      <header class="topbar">
+        <a class="logo logo-light" href="/dashboard" aria-label="KBO Soluções">
+          <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="180" height="48" />
+        </a>
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href="/dashboard">Início</a><span>/</span><a href="/projects">Projetos</a><span>/</span
+          ><strong x-text="project && project.code"></strong>
+        </nav>
+        <form class="global-search" @submit.prevent="runGlobalSearch">
+          <span>⌕</span
+          ><input
+            type="search"
+            placeholder="Buscar projetos, tarefas..."
+            aria-label="Busca global"
+            x-model="globalSearch"
+          />
+        </form>
+        <div class="profile">
+          <button class="profile-trigger" @click="toggleProfile">
+            <span class="avatar" x-text="initials(user && user.username)"></span
+            ><span class="profile-copy"
+              ><strong x-text="user && user.username"></strong
+              ><small x-text="user && user.role"></small></span
+            ><span>⌄</span>
+          </button>
+          <div class="profile-menu" x-show="profileOpen">
+            <button @click="signOut">Sair da conta</button>
+          </div>
+        </div>
+      </header>
+      <main class="page">
+        <div class="skeleton detail-skeleton" x-show="loading"></div>
+        <div class="error-state" x-cloak x-show="error">
+          <div class="empty-art">!</div>
+          <h2>Projeto indisponível</h2>
+          <p x-text="error"></p>
+          <button class="btn btn-secondary" @click="load">Tentar novamente</button>
+        </div>
+        <template x-if="project"
+          ><div>
+            <section class="project-hero">
+              <div>
+                <div class="hero-meta">
+                  <span class="code" x-text="project.code"></span
+                  ><span
+                    class="pill"
+                    :class="project.status.toLowerCase()"
+                    x-text="label(project.status)"
+                  ></span
+                  ><span class="due"
+                    ><i :class="project.health.toLowerCase()"></i
+                    ><span x-text="project.health"></span
+                  ></span>
+                </div>
+                <h1 x-text="project.name"></h1>
+                <p x-text="project.description || 'Sem descrição.'"></p>
+              </div>
+              <div class="hero-actions">
+                <button
+                  class="btn btn-secondary"
+                  @click="editProject"
+                  x-show="isAdmin"
+                  :disabled="project.archivedAt"
+                >
+                  Editar projeto
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  type="button"
+                  x-show="!project.archivedAt"
+                  @click="archiveProject"
+                >
+                  Arquivar projeto
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  type="button"
+                  x-show="project.archivedAt && isAdmin"
+                  @click="restoreProject"
+                >
+                  Restaurar projeto
+                </button>
+                <button
+                  class="btn btn-danger"
+                  type="button"
+                  x-show="project.archivedAt && isAdmin"
+                  @click="deleteProject"
+                >
+                  Excluir projeto
+                </button>
+                <a class="btn btn-primary" :href="'/projects/'+project.id+'/tasks'"
+                  >Abrir tarefas →</a
+                >
+              </div>
+            </section>
+            <nav class="tabs" aria-label="Seções do projeto">
+              <button :class="activeTab === 'overview' ? 'active' : ''" @click="tabOverview">
+                Visão Geral</button
+              ><button :class="activeTab === 'tasks' ? 'active' : ''" @click="tabTasks">
+                Tarefas <span class="count" x-text="tasks.length"></span></button
+              ><button :class="activeTab === 'releases' ? 'active' : ''" @click="tabReleases">
+                Releases</button
+              ><button :class="activeTab === 'notes' ? 'active' : ''" @click="tabNotes">
+                Notas
+              </button>
+            </nav>
+            <section class="detail-grid" x-show="activeTab === 'overview'">
+              <article class="panel span-2">
+                <div class="section-head">
+                  <div>
+                    <h2>Informações do projeto</h2>
+                    <p>Planejamento e contexto da iniciativa.</p>
+                  </div>
+                </div>
+                <dl class="info-grid">
+                  <div>
+                    <dt>Cliente / Área</dt>
+                    <dd x-text="project.clientArea"></dd>
+                  </div>
+                  <div>
+                    <dt>Prioridade</dt>
+                    <dd x-text="project.priority"></dd>
+                  </div>
+                  <div>
+                    <dt>Início planejado</dt>
+                    <dd x-text="date(project.plannedStartDate)"></dd>
+                  </div>
+                  <div>
+                    <dt>Prazo</dt>
+                    <dd x-text="date(project.dueDate)"></dd>
+                  </div>
+                  <div>
+                    <dt>Progresso</dt>
+                    <dd>
+                      <div class="table-progress">
+                        <div class="progress">
+                          <span :style="'width:'+project.progressPercent+'%'"></span>
+                        </div>
+                        <span x-text="project.progressPercent+'%'"></span>
+                      </div>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Tecnologias</dt>
+                    <dd class="tag-row">
+                      <template x-for="tech in project.technologyStack"
+                        ><span class="tag" x-text="tech"></span
+                      ></template>
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+              <article class="panel">
+                <div class="section-head">
+                  <div>
+                    <h2>Equipe</h2>
+                    <p>Responsáveis pelo projeto.</p>
+                  </div>
+                </div>
+                <div class="team-list">
+                  <template x-for="member in project.responsibleTeam"
+                    ><div>
+                      <span class="avatar" x-text="initials(member)"></span
+                      ><span><strong x-text="member"></strong><small>Equipe KBO</small></span>
+                    </div></template
+                  >
+                </div>
+              </article>
+              <article class="panel span-2">
+                <div class="section-head">
+                  <div>
+                    <h2>Últimas tarefas</h2>
+                    <p>Atividades atualizadas recentemente.</p>
+                  </div>
+                  <a :href="'/projects/'+project.id+'/tasks'">Ver todas →</a>
+                </div>
+                <div class="task-list">
+                  <template x-for="task in recentTasks" :key="task.id"
+                    ><div class="task-row">
+                      <span
+                        class="priority"
+                        :class="task.priority.toLowerCase()"
+                        x-text="task.priority"
+                      ></span>
+                      <div>
+                        <strong x-text="task.title"></strong
+                        ><small x-text="task.assignee || 'Não atribuído'"></small>
+                      </div>
+                      <span
+                        class="pill"
+                        :class="task.status.toLowerCase()"
+                        x-text="label(task.status)"
+                      ></span
+                      ><time x-text="date(task.dueDate)"></time></div
+                  ></template>
+                  <div class="empty-mini" x-show="tasks.length === 0">
+                    Nenhuma tarefa cadastrada.
+                  </div>
+                </div>
+              </article>
+              <article class="panel">
+                <div class="section-head">
+                  <div>
+                    <h2>Notas recentes</h2>
+                    <p>Contexto registrado no projeto.</p>
+                  </div>
+                </div>
+                <div class="timeline" x-show="project.notes">
+                  <span></span>
+                  <div>
+                    <strong>Nota do projeto</strong>
+                    <p x-text="project.notes"></p>
+                    <small
+                      x-text="date(project.updatedAt && project.updatedAt.slice(0,10))"
+                    ></small>
+                  </div>
+                </div>
+                <div class="empty-mini" x-show="!project.notes">Nenhuma nota registrada.</div>
+              </article>
+            </section>
+            <section x-show="activeTab === 'tasks'" class="tab-panel tab-panel-kanban">
+              <div class="kanban-mini">
+                <div class="kanban-column" data-status="PENDENTE">
+                  <header>
+                    <span class="dot dot-pendente"></span>Pendente
+                    <span class="count" x-text="countByStatus('PENDENTE')"></span>
+                  </header>
+                  <div
+                    class="kanban-list"
+                    @dragover.prevent
+                    @drop.prevent="onDrop($event, 'PENDENTE')"
+                  >
+                    <template x-for="t in tasksByStatus('PENDENTE')" :key="t.id">
+                      <article
+                        class="task-card-mini"
+                        draggable="true"
+                        @dragstart="onDragStart($event, t)"
+                      >
+                        <strong x-text="t.title"></strong>
+                        <small x-text="t.assignee || '—'"></small>
+                        <footer><span x-text="date(t.dueDate)"></span></footer>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+                <div class="kanban-column" data-status="EM_ANDAMENTO">
+                  <header>
+                    <span class="dot dot-andamento"></span>Em andamento
+                    <span class="count" x-text="countByStatus('EM_ANDAMENTO')"></span>
+                  </header>
+                  <div
+                    class="kanban-list"
+                    @dragover.prevent
+                    @drop.prevent="onDrop($event, 'EM_ANDAMENTO')"
+                  >
+                    <template x-for="t in tasksByStatus('EM_ANDAMENTO')" :key="t.id">
+                      <article
+                        class="task-card-mini"
+                        draggable="true"
+                        @dragstart="onDragStart($event, t)"
+                      >
+                        <strong x-text="t.title"></strong>
+                        <small x-text="t.assignee || '—'"></small>
+                        <footer><span x-text="date(t.dueDate)"></span></footer>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+                <div class="kanban-column" data-status="BLOQUEADA">
+                  <header>
+                    <span class="dot dot-bloqueada"></span>Bloqueada
+                    <span class="count" x-text="countByStatus('BLOQUEADA')"></span>
+                  </header>
+                  <div
+                    class="kanban-list"
+                    @dragover.prevent
+                    @drop.prevent="onDrop($event, 'BLOQUEADA')"
+                  >
+                    <template x-for="t in tasksByStatus('BLOQUEADA')" :key="t.id">
+                      <article
+                        class="task-card-mini"
+                        draggable="true"
+                        @dragstart="onDragStart($event, t)"
+                      >
+                        <strong x-text="t.title"></strong>
+                        <small x-text="t.assignee || '—'"></small>
+                        <footer><span x-text="date(t.dueDate)"></span></footer>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+                <div class="kanban-column" data-status="CONCLUIDA">
+                  <header>
+                    <span class="dot dot-concluida"></span>Concluída
+                    <span class="count" x-text="countByStatus('CONCLUIDA')"></span>
+                  </header>
+                  <div
+                    class="kanban-list"
+                    @dragover.prevent
+                    @drop.prevent="onDrop($event, 'CONCLUIDA')"
+                  >
+                    <template x-for="t in tasksByStatus('CONCLUIDA')" :key="t.id">
+                      <article
+                        class="task-card-mini"
+                        draggable="true"
+                        @dragstart="onDragStart($event, t)"
+                      >
+                        <strong x-text="t.title"></strong>
+                        <small x-text="t.assignee || '—'"></small>
+                        <footer><span x-text="date(t.dueDate)"></span></footer>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+                <div class="kanban-column" data-status="CANCELADA">
+                  <header>
+                    <span class="dot dot-cancelada"></span>Cancelada
+                    <span class="count" x-text="countByStatus('CANCELADA')"></span>
+                  </header>
+                  <div
+                    class="kanban-list"
+                    @dragover.prevent
+                    @drop.prevent="onDrop($event, 'CANCELADA')"
+                  >
+                    <template x-for="t in tasksByStatus('CANCELADA')" :key="t.id">
+                      <article
+                        class="task-card-mini"
+                        draggable="true"
+                        @dragstart="onDragStart($event, t)"
+                      >
+                        <strong x-text="t.title"></strong>
+                        <small x-text="t.assignee || '—'"></small>
+                        <footer><span x-text="date(t.dueDate)"></span></footer>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section x-show="activeTab === 'releases'" class="tab-panel">
+              <div class="empty-state">
+                <div class="empty-art">◇</div>
+                <h3>Nenhuma release cadastrada</h3>
+                <p>O backend de releases ainda não está disponível. Nenhum dado foi simulado.</p>
+              </div>
+            </section>
+            <section x-show="activeTab === 'notes'" class="tab-panel">
+              <div class="empty-state" x-show="!project.notes">
+                <div class="empty-art">✎</div>
+                <h3>Nenhuma nota cadastrada</h3>
+                <p>Adicione notas editando o projeto.</p>
+              </div>
+              <article class="panel note-full" x-show="project.notes">
+                <h2>Notas do projeto</h2>
+                <p x-text="project.notes"></p>
+              </article>
+            </section></div
+        ></template>
+      </main>
+      <div class="toast" :class="toastType" x-show="toast" x-text="toast"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

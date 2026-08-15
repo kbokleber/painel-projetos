@@ -2,67 +2,63 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Gestão de projetos internos da KBO Soluções" />
-    <title>Projetos | Painel de Projetos KBO</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Projetos KBO" />
+    <title>Projetos | KBO</title>
   </head>
   <body>
-    <div class="dashboard-shell" x-data="projectsPage">
-      <header class="dashboard-header">
-        <div>
-          <strong>Painel de Projetos KBO</strong>
-          <small x-cloak x-show="user"><span x-text="userLabel"></span></small>
-        </div>
-        <nav class="header-actions" aria-label="Navegação principal">
-          <a class="header-link" href="/dashboard">Dashboard</a>
-          <button class="secondary-button" type="button" @click="logout">Sair</button>
+    <div class="app-shell" x-data="projectsPage" x-init="init">
+      <header class="topbar">
+        <a class="logo logo-light" href="/dashboard" aria-label="KBO Soluções">
+          <img src="/branding/kbo-logo.png" alt="KBO Soluções" width="180" height="48" />
+        </a>
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a href="/dashboard">Início</a><span>/</span><strong>Projetos</strong>
         </nav>
+        <form class="global-search" @submit.prevent="runGlobalSearch">
+          <span>⌕</span
+          ><input
+            type="search"
+            placeholder="Buscar projetos, tarefas..."
+            aria-label="Busca global"
+            x-model="globalSearch"
+          />
+        </form>
+        <div class="profile">
+          <button class="profile-trigger" type="button" @click="toggleProfile">
+            <span class="avatar" x-text="initials(user && user.username)"></span
+            ><span class="profile-copy"
+              ><strong x-text="user && user.username"></strong
+              ><small x-text="user && user.role"></small></span
+            ><span>⌄</span>
+          </button>
+          <div class="profile-menu" x-cloak x-show="profileOpen">
+            <button @click="signOut">Sair da conta</button>
+          </div>
+        </div>
       </header>
-
-      <main class="dashboard-main projects-main">
+      <main class="page">
         <section class="page-heading">
           <div>
-            <span class="brand-mark">Fase 2</span>
-            <h1>Projetos</h1>
-            <p class="subtitle">Cadastre, acompanhe e filtre os projetos internos.</p>
+            <p class="eyebrow">PORTFÓLIO</p>
+            <h1>Todos os projetos</h1>
+            <p>Organize, acompanhe e mantenha cada entrega sob controle.</p>
           </div>
-          <button class="primary-button compact-button" type="button" @click="openCreate">
-            Novo projeto
+          <button class="btn btn-primary" type="button" x-show="isAdmin" @click="openCreate">
+            + Novo projeto
           </button>
         </section>
-
-        <p
-          class="error-message panel-message"
-          role="alert"
-          x-cloak
-          x-show="error"
-          x-text="error"
-        ></p>
-        <p
-          class="success-message panel-message"
-          role="status"
-          x-cloak
-          x-show="success"
-          x-text="success"
-        ></p>
-
-        <section class="filter-card" aria-labelledby="filters-title">
-          <div class="section-title-row">
-            <h2 id="filters-title">Filtros</h2>
-            <button class="text-button" type="button" @click="clearFilters">Limpar</button>
-          </div>
+        <section class="filter-card">
           <form class="filter-grid" @submit.prevent="applyFilters">
-            <label>
-              Busca
-              <input
+            <label class="search-field"
+              ><span>⌕</span
+              ><input
                 type="search"
-                x-model.trim="filters.search"
-                placeholder="Nome, código ou descrição"
-              />
-            </label>
-            <label>
-              Status
-              <select x-model="filters.status">
+                placeholder="Buscar por nome, código ou descrição"
+                x-model="filters.search" /></label
+            ><label
+              ><span>Status</span
+              ><select x-model="filters.status">
                 <option value="">Todos</option>
                 <option value="BACKLOG">Backlog</option>
                 <option value="PLANEJADO">Planejado</option>
@@ -70,255 +66,299 @@
                 <option value="PAUSADO">Pausado</option>
                 <option value="CONCLUIDO">Concluído</option>
                 <option value="CANCELADO">Cancelado</option>
-              </select>
-            </label>
-            <label>
-              Cliente/Área
-              <input type="text" x-model.trim="filters.clientArea" maxlength="160" />
-            </label>
-            <label>
-              Responsável
-              <input type="text" x-model.trim="filters.responsible" maxlength="120" />
-            </label>
-            <label>
-              Prioridade
-              <select x-model="filters.priority">
+              </select></label
+            ><label
+              ><span>Prioridade</span
+              ><select x-model="filters.priority">
                 <option value="">Todas</option>
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="CRITICA">Crítica</option>
-              </select>
-            </label>
-            <label>
-              Início do período
-              <input type="date" x-model="filters.periodFrom" />
-            </label>
-            <label>
-              Fim do período
-              <input type="date" x-model="filters.periodTo" />
-            </label>
-            <label>
-              Arquivamento
-              <select x-model="filters.archived">
-                <option value="exclude">Ativos</option>
-                <option value="include">Todos</option>
-                <option value="only">Somente arquivados</option>
-              </select>
-            </label>
-            <button class="secondary-button filter-submit" type="submit">Aplicar filtros</button>
+                <option>BAIXA</option>
+                <option>MEDIA</option>
+                <option>ALTA</option>
+                <option>CRITICA</option>
+              </select></label
+            ><label
+              ><span>Cliente / Área</span
+              ><input x-model="filters.clientArea" placeholder="Todos" /></label
+            ><label
+              ><span>Saúde</span
+              ><select x-model="filters.health">
+                <option value="">Todas</option>
+                <option>VERDE</option>
+                <option>AMARELO</option>
+                <option>VERMELHO</option>
+              </select></label
+            ><label
+              ><span>Responsável</span
+              ><input x-model="filters.responsible" placeholder="Todos" /></label
+            ><label><span>De</span><input type="date" x-model="filters.periodFrom" /></label
+            ><label><span>Até</span><input type="date" x-model="filters.periodTo" /></label
+            ><label
+              ><span>Arquivados</span
+              ><select x-model="filters.archived">
+                <option value="exclude">Ocultar</option>
+                <option value="include">Incluir</option>
+                <option value="only">Somente</option>
+              </select></label
+            ><button class="btn btn-secondary" type="submit">Aplicar filtros</button
+            ><button class="btn btn-ghost" type="button" @click="clearFilters">Limpar</button>
           </form>
         </section>
-
-        <section class="stats-grid" aria-label="Resumo dos projetos">
-          <article><strong x-text="stats.total"></strong><span>Total</span></article>
-          <article><strong x-text="stats.inProgress"></strong><span>Em andamento</span></article>
-          <article>
-            <strong x-text="stats.critical"></strong><span>Prioridade crítica</span>
-          </article>
-          <article><strong x-text="stats.redHealth"></strong><span>Saúde vermelha</span></article>
-        </section>
-
-        <section class="table-card" aria-labelledby="projects-title">
-          <div class="section-title-row">
-            <h2 id="projects-title">Lista de projetos</h2>
-            <span class="subtitle" x-text="paginationLabel"></span>
-          </div>
-          <p class="subtitle loading-state" x-cloak x-show="loading">Carregando projetos…</p>
-          <p class="subtitle loading-state" x-cloak x-show="showEmpty">
-            Nenhum projeto encontrado.
-          </p>
-          <div class="table-scroll" x-cloak x-show="showTable">
-            <table>
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Projeto</th>
-                  <th>Status</th>
-                  <th>Prioridade</th>
-                  <th>Saúde</th>
-                  <th>Prazo</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="project in projects" :key="project.id">
-                  <tr>
-                    <td><strong x-text="project.code"></strong></td>
-                    <td>
-                      <span x-text="project.name"></span>
-                      <small x-text="project.clientArea"></small>
-                    </td>
-                    <td><span class="badge" x-text="project.status"></span></td>
-                    <td><span class="badge" x-text="project.priority"></span></td>
-                    <td><span class="badge" x-text="project.health"></span></td>
-                    <td x-text="project.dueDate || 'Sem prazo'"></td>
-                    <td class="row-actions">
-                      <a class="text-button" :href="'/projects/' + project.id + '/tasks'"
-                        >Tarefas</a
-                      >
-                      <button
-                        class="text-button"
-                        type="button"
-                        x-show="!project.archivedAt"
-                        @click="openEdit($event)"
-                        :data-id="project.id"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        class="text-button danger-text"
-                        type="button"
-                        :data-id="project.id"
-                        x-show="!project.archivedAt"
-                        @click="archiveProject"
-                      >
-                        Arquivar
-                      </button>
-                      <button
-                        class="text-button"
-                        type="button"
-                        :data-id="project.id"
-                        x-show="project.archivedAt && isAdmin"
-                        @click="restoreProject"
-                      >
-                        Restaurar
-                      </button>
-                      <button
-                        class="text-button danger-text"
-                        type="button"
-                        :data-id="project.id"
-                        x-show="project.archivedAt && isAdmin"
-                        @click="deleteProject"
-                      >
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          <div class="pagination" x-cloak x-show="showPagination">
+        <div class="content-toolbar">
+          <p><strong x-text="total"></strong> projetos encontrados</p>
+          <div class="view-toggle">
             <button
-              class="secondary-button"
               type="button"
-              @click="previousPage"
-              :disabled="isFirstPage"
+              aria-label="Visualização em cards"
+              :class="view === 'cards' ? 'active' : ''"
+              @click="setCards"
             >
-              Anterior
-            </button>
-            <button class="secondary-button" type="button" @click="nextPage" :disabled="isLastPage">
-              Próxima
+              ▦</button
+            ><button
+              type="button"
+              aria-label="Visualização em tabela"
+              :class="view === 'table' ? 'active' : ''"
+              @click="setTable"
+            >
+              ☷
             </button>
           </div>
+        </div>
+        <div class="error-state compact" x-cloak x-show="error">
+          <strong>Não foi possível carregar</strong><span x-text="error"></span
+          ><button class="btn btn-secondary" @click="load">Tentar novamente</button>
+        </div>
+        <div class="project-grid" x-show="loading">
+          <template x-for="i in 6"><div class="skeleton project-skeleton"></div></template>
+        </div>
+        <section class="project-grid" x-cloak x-show="hasProjects && view === 'cards'">
+          <template x-for="p in projects" :key="p.id"
+            ><article class="project-card trello">
+              <div class="card-top">
+                <span class="code" x-text="p.code"></span>
+                <div class="card-menu">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    :data-id="p.id"
+                    @click="toggleMenu"
+                    aria-label="Ações do projeto"
+                  >
+                    •••
+                  </button>
+                  <div class="dropdown" x-show="menuId === p.id">
+                    <a :href="'/projects/'+p.id">Ver detalhes</a
+                    ><button :data-id="p.id" x-show="isAdmin" @click="openEdit">Editar</button
+                    ><button :data-id="p.id" @click="archiveProject" x-show="!p.archivedAt">
+                      Arquivar</button
+                    ><button
+                      :data-id="p.id"
+                      @click="restoreProject"
+                      x-show="p.archivedAt && isAdmin"
+                    >
+                      Restaurar</button
+                    ><button
+                      class="danger"
+                      :data-id="p.id"
+                      @click="deleteProject"
+                      x-show="p.archivedAt && isAdmin"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <a class="card-link" :href="'/projects/'+p.id"
+                ><span class="pill" :class="p.status.toLowerCase()" x-text="label(p.status)"></span>
+                <h3 x-text="p.name"></h3>
+                <p x-text="p.description || p.clientArea"></p>
+                <div class="progress-label">
+                  <span>Progresso</span><strong x-text="p.progressPercent+'%'"></strong>
+                </div>
+                <div class="progress"><span :style="'width:'+p.progressPercent+'%'"></span></div>
+                <footer>
+                  <div class="avatar-stack">
+                    <template x-for="m in p.responsibleTeam.slice(0,3)"
+                      ><span class="avatar small" x-text="initials(m)"></span
+                    ></template>
+                  </div>
+                  <span class="due"
+                    ><i :class="p.health.toLowerCase()"></i><span x-text="date(p.dueDate)"></span
+                  ></span></footer
+              ></a></article
+          ></template>
         </section>
-
-        <section class="form-card" x-cloak x-show="formOpen" aria-labelledby="project-form-title">
-          <div class="section-title-row">
-            <h2 id="project-form-title" x-text="formTitle"></h2>
-            <button class="text-button" type="button" @click="closeForm">Fechar</button>
-          </div>
-          <p class="subtitle">O código KBO será gerado automaticamente pelo banco.</p>
-          <form class="project-form-grid" @submit.prevent="saveProject" novalidate>
-            <label>
-              Nome *
-              <input type="text" x-model.trim="form.name" maxlength="160" required />
-            </label>
-            <label>
-              Slug *
-              <input type="text" x-model.trim="form.slug" maxlength="180" required />
-            </label>
-            <label>
-              Cliente/Área *
-              <input type="text" x-model.trim="form.clientArea" maxlength="160" required />
-            </label>
-            <label>
-              Status
-              <select x-model="form.status">
-                <option value="BACKLOG">Backlog</option>
-                <option value="PLANEJADO">Planejado</option>
-                <option value="EM_ANDAMENTO">Em andamento</option>
-                <option value="PAUSADO">Pausado</option>
-                <option value="CONCLUIDO">Concluído</option>
-                <option value="CANCELADO">Cancelado</option>
-              </select>
-            </label>
-            <label>
-              Prioridade
-              <select x-model="form.priority">
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="CRITICA">Crítica</option>
-              </select>
-            </label>
-            <label>
-              Saúde
-              <select x-model="form.health">
-                <option value="VERDE">Verde</option>
-                <option value="AMARELO">Amarelo</option>
-                <option value="VERMELHO">Vermelho</option>
-              </select>
-            </label>
-            <label>
-              Início planejado
-              <input type="date" x-model="form.plannedStartDate" />
-            </label>
-            <label>
-              Prazo
-              <input type="date" x-model="form.dueDate" />
-            </label>
-            <label>
-              Fim real
-              <input type="date" x-model="form.actualEndDate" />
-            </label>
-            <label class="wide-field">
-              Equipe responsável
-              <input
-                type="text"
-                x-model="form.responsibleTeamText"
-                placeholder="Ana, Manoel, Pedro"
-              />
-            </label>
-            <label class="wide-field">
-              Stack/Tecnologias
-              <input
-                type="text"
-                x-model="form.technologyStackText"
-                placeholder="Node.js, PostgreSQL"
-              />
-            </label>
-            <label class="wide-field">
-              Repositório Git
-              <input type="url" x-model.trim="form.repositoryUrl" maxlength="2048" />
-            </label>
-            <label class="wide-field">
-              URL de produção
-              <input type="url" x-model.trim="form.productionUrl" maxlength="2048" />
-            </label>
-            <label class="wide-field">
-              Justificativa da saúde
-              <textarea x-model.trim="form.healthReason" maxlength="2000"></textarea>
-            </label>
-            <label class="wide-field">
-              Descrição
-              <textarea x-model.trim="form.description" maxlength="50000"></textarea>
-            </label>
-            <label class="wide-field">
-              Notas/Observações
-              <textarea x-model.trim="form.notes" maxlength="50000"></textarea>
-            </label>
-            <div class="form-actions wide-field">
-              <button class="secondary-button" type="button" @click="closeForm">Cancelar</button>
-              <button class="primary-button compact-button" type="submit" :disabled="saving">
-                <span x-show="!saving">Salvar projeto</span>
-                <span x-cloak x-show="saving">Salvando…</span>
-              </button>
+        <div class="table-card" x-cloak x-show="hasProjects && view === 'table'">
+          <table>
+            <thead>
+              <tr>
+                <th>Projeto</th>
+                <th>Status</th>
+                <th>Progresso</th>
+                <th>Equipe</th>
+                <th>Saúde</th>
+                <th>Prazo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="p in projects" :key="p.id"
+                ><tr>
+                  <td>
+                    <a :href="'/projects/'+p.id"
+                      ><span class="code" x-text="p.code"></span><strong x-text="p.name"></strong
+                    ></a>
+                  </td>
+                  <td>
+                    <span
+                      class="pill"
+                      :class="p.status.toLowerCase()"
+                      x-text="label(p.status)"
+                    ></span>
+                  </td>
+                  <td>
+                    <div class="table-progress">
+                      <div class="progress">
+                        <span :style="'width:'+p.progressPercent+'%'"></span>
+                      </div>
+                      <span x-text="p.progressPercent+'%'"></span>
+                    </div>
+                  </td>
+                  <td x-text="p.responsibleTeam.join(', ') || '—'"></td>
+                  <td>
+                    <span class="due"
+                      ><i :class="p.health.toLowerCase()"></i><span x-text="p.health"></span
+                    ></span>
+                  </td>
+                  <td x-text="date(p.dueDate)"></td>
+                  <td>
+                    <a class="icon-btn" :href="'/projects/'+p.id" aria-label="Abrir projeto">→</a>
+                  </td>
+                </tr></template
+              >
+            </tbody>
+          </table>
+        </div>
+        <div class="empty-state" x-cloak x-show="!loading && !error && projects.length === 0">
+          <div class="empty-art">◇</div>
+          <h3>Nenhum projeto encontrado</h3>
+          <p
+            x-text="isAdmin ? 'Ajuste os filtros ou crie um novo projeto.' : 'Ajuste os filtros para localizar projetos.'"
+          ></p>
+          <button class="btn btn-primary" x-show="isAdmin" @click="openCreate">
+            Criar projeto
+          </button>
+        </div>
+        <nav class="pagination" x-show="total > pageSize">
+          <button class="btn btn-secondary" @click="previousPage" :disabled="isFirstPage">
+            ← Anterior</button
+          ><span>Página <strong x-text="page"></strong></span
+          ><button class="btn btn-secondary" @click="nextPage" :disabled="isLastPage">
+            Próxima →
+          </button>
+        </nav>
+      </main>
+      <div class="modal-backdrop" x-cloak x-show="formOpen" @click.self="closeForm">
+        <section
+          class="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="project-form-title"
+          @keydown="handleModalKeydown"
+        >
+          <header>
+            <div>
+              <span class="eyebrow">PROJETO</span>
+              <h2 id="project-form-title" x-text="form.id ? 'Editar projeto' : 'Novo projeto'"></h2>
             </div>
+            <button class="icon-btn" @click="closeForm" aria-label="Fechar">×</button>
+          </header>
+          <form @submit.prevent="saveProject" novalidate>
+            <p class="inline-alert" x-show="formError" x-text="formError"></p>
+            <fieldset>
+              <legend>Informações principais</legend>
+              <div class="modal-grid">
+                <label
+                  >Nome *<input
+                    data-project-name
+                    x-model.trim="form.name"
+                    maxlength="160"
+                    required /></label
+                ><label>Slug *<input x-model.trim="form.slug" maxlength="180" required /></label
+                ><label
+                  >Cliente / Área *<input
+                    x-model.trim="form.clientArea"
+                    maxlength="160"
+                    required /></label
+                ><label
+                  >Status<select x-model="form.status">
+                    <option>BACKLOG</option>
+                    <option>PLANEJADO</option>
+                    <option>EM_ANDAMENTO</option>
+                    <option>PAUSADO</option>
+                    <option>CONCLUIDO</option>
+                    <option>CANCELADO</option>
+                  </select></label
+                ><label
+                  >Prioridade<select x-model="form.priority">
+                    <option>BAIXA</option>
+                    <option>MEDIA</option>
+                    <option>ALTA</option>
+                    <option>CRITICA</option>
+                  </select></label
+                ><label
+                  >Saúde<select x-model="form.health">
+                    <option>VERDE</option>
+                    <option>AMARELO</option>
+                    <option>VERMELHO</option>
+                  </select></label
+                ><label class="span-2"
+                  >Descrição<textarea x-model.trim="form.description" rows="3"></textarea>
+                </label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Planejamento e equipe</legend>
+              <div class="modal-grid">
+                <label>Início<input type="date" x-model="form.plannedStartDate" /></label
+                ><label>Prazo<input type="date" x-model="form.dueDate" /></label
+                ><label>Fim real<input type="date" x-model="form.actualEndDate" /></label
+                ><label
+                  >Equipe (separe por vírgulas)<input x-model="form.responsibleTeamText" /></label
+                ><label class="span-2"
+                  >Tecnologias<input x-model="form.technologyStackText"
+                /></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Links e contexto</legend>
+              <div class="modal-grid">
+                <label>Repositório<input type="url" x-model.trim="form.repositoryUrl" /></label
+                ><label>Produção<input type="url" x-model.trim="form.productionUrl" /></label
+                ><label class="span-2"
+                  >Justificativa da saúde<textarea
+                    x-model.trim="form.healthReason"
+                  ></textarea></label
+                ><label class="span-2">Notas<textarea x-model.trim="form.notes"></textarea></label>
+              </div>
+            </fieldset>
+            <footer>
+              <button class="btn btn-secondary" type="button" @click="closeForm">Cancelar</button
+              ><button class="btn btn-primary" type="submit" :disabled="saving">
+                <span class="spinner" x-show="saving"></span
+                ><span x-text="saving ? 'Salvando…' : 'Salvar projeto'"></span>
+              </button>
+            </footer>
           </form>
         </section>
-      </main>
+      </div>
+      <div
+        class="toast"
+        :class="toastType"
+        x-cloak
+        x-show="toast"
+        role="status"
+        x-text="toast"
+      ></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
